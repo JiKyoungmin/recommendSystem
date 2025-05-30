@@ -1,4 +1,3 @@
-# %%
 import pandas as pd
 import numpy as np
 import pickle
@@ -11,11 +10,14 @@ from surprise.model_selection import GridSearchCV, train_test_split, cross_valid
 from surprise import accuracy
 import random
 
+RANDOM_SEED = 662
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# %%
 class SVDppRecommendationPipeline:
     """
     SVD++ 기반 추천 시스템 파이프라인
@@ -88,6 +90,68 @@ class SVDppRecommendationPipeline:
         logger.info("✅ Surprise 데이터셋 생성 완료")
         return surprise_data
     
+    def get_stable_performance(self, surprise_data, n_runs=5):
+        """
+        여러 seed로 실행해서 안정적인 성능 평가
+        
+        Args:
+            surprise_data: Surprise 데이터셋
+            n_runs: 실행할 seed 개수
+            
+        Returns:
+            dict: 평균 성능과 분산 정보
+        """
+        logger.info(f"🎯 안정적인 성능 평가 시작 ({n_runs}회 실행)")
+        
+        seeds = [42, 123, 456, 789, 999][:n_runs]
+        rmse_scores = []
+        mae_scores = []
+        
+        for i, seed in enumerate(seeds, 1):
+            logger.info(f"  실행 {i}/{n_runs} (seed: {seed})")
+            
+            # 각 seed로 모델 생성
+            model = SVDpp(
+                n_factors=50, 
+                n_epochs=20, 
+                lr_all=0.01,
+                reg_all=0.05,
+                random_state=seed
+            )
+            
+            # 교차검증으로 성능 측정
+            cv_results = cross_validate(
+                model, surprise_data, 
+                measures=['RMSE', 'MAE'], 
+                cv=3, 
+                verbose=False
+            )
+            
+            rmse_scores.append(cv_results['test_rmse'].mean())
+            mae_scores.append(cv_results['test_mae'].mean())
+        
+        # 결과 정리
+        performance_stats = {
+            'rmse_mean': np.mean(rmse_scores),
+            'rmse_std': np.std(rmse_scores),
+            'rmse_min': np.min(rmse_scores),
+            'rmse_max': np.max(rmse_scores),
+            'mae_mean': np.mean(mae_scores),
+            'mae_std': np.std(mae_scores),
+            'mae_min': np.min(mae_scores),
+            'mae_max': np.max(mae_scores),
+            'individual_rmse': rmse_scores,
+            'individual_mae': mae_scores
+        }
+        
+        # 결과 로깅
+        logger.info("📊 안정적인 성능 평가 완료:")
+        logger.info(f"  RMSE: {performance_stats['rmse_mean']:.4f} ± {performance_stats['rmse_std']:.4f}")
+        logger.info(f"  RMSE 범위: [{performance_stats['rmse_min']:.4f}, {performance_stats['rmse_max']:.4f}]")
+        logger.info(f"  MAE: {performance_stats['mae_mean']:.4f} ± {performance_stats['mae_std']:.4f}")
+        
+        return performance_stats
+
     def optimize_hyperparameters(self, surprise_data, quick_search=True):
         """
         SVD++ 하이퍼파라미터 최적화
@@ -96,21 +160,23 @@ class SVDppRecommendationPipeline:
         logger.info("⚙️ 하이퍼파라미터 최적화 시작")
         
         if quick_search:
-            # 빠른 탐색용 파라미터 (개발/테스트용)
+            # 빠른 탐색용 파라미터
             param_grid = {
                 'n_factors': [50, 100],
                 'n_epochs': [20, 30], 
                 'lr_all': [0.01, 0.02],
-                'reg_all': [0.02, 0.05]
+                'reg_all': [0.02, 0.05],
+                'random_state': [RANDOM_SEED]
             }
             cv_folds = 3
         else:
-            # 정밀 탐색용 파라미터 (실제 운영용)
+            # 정밀 탐색용 파라미터
             param_grid = {
                 'n_factors': [50, 100, 150],
                 'n_epochs': [20, 30, 40],
                 'lr_all': [0.005, 0.01, 0.02],
-                'reg_all': [0.02, 0.05, 0.1]
+                'reg_all': [0.02, 0.05, 0.1],
+                'random_state': [RANDOM_SEED]
             }
             cv_folds = 5
         
@@ -226,20 +292,31 @@ class SVDppRecommendationPipeline:
         
         logger.info("✅ 모델 결과 저장 완료")
     
-    def run_full_pipeline(self, quick_search=True):
+    def run_full_pipeline(self, quick_search=True, stability_test=True):
         """
         전체 파이프라인 실행
         전처리된 데이터 로드부터 모델 학습, 결과 저장까지 모든 과정을 순차 실행
         
         Args:
             quick_search: True면 빠른 하이퍼파라미터 탐색, False면 정밀 탐색
+            stability_test: True면 안정적인 성능 평가 수행
         """
         logger.info("🚀 SVD++ 추천 시스템 파이프라인 시작")
+
         
         try:
             # 1. 전처리된 데이터 로드
             self.load_preprocessed_data()
             
+            # 2. 안정적인 성능 평가 (선택사항)
+            if stability_test:
+                stability_results = self.get_stable_performance(self.surprise_data, n_runs=3)
+            
+                # 성능이 너무 불안정하면 경고
+                if stability_results['rmse_std'] > 0.7:
+                    logger.warning(f"⚠️  RMSE 표준편차가 높음: {stability_results['rmse_std']:.4f}")
+                    logger.warning("데이터 증가 후 재평가 권장")
+
             # 2. 하이퍼파라미터 최적화
             best_params, best_scores = self.optimize_hyperparameters(
                 self.surprise_data, quick_search=quick_search
@@ -330,11 +407,11 @@ if __name__ == "__main__":
     pipeline = SVDppRecommendationPipeline(result_dir)
     
     # 전체 파이프라인 실행
-    success = pipeline.run_full_pipeline(quick_search=True)
+    success = pipeline.run_full_pipeline(quick_search=True, stability_test=True)
     
     if success:
         # 사용자 0에 대한 추천 예시
-        recommendations = pipeline.get_recommendations(user_id=0, n_recommendations=5)
+        recommendations = pipeline.get_recommendations(user_id=0, n_recommendations=10)
         if recommendations:
             print("\n🍽️  추천 식당:")
             for rec in recommendations:
