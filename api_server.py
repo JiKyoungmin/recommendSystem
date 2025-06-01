@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-@app.route('/api/recommendation/restaurants', methods=['POST', 'GET'])
+@app.route('/recommendation/restaurants', methods=['POST', 'GET'])
 def recommend_restaurants():
     """
     식당 추천 API 엔드포인트
