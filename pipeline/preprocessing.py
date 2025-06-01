@@ -2,6 +2,7 @@
 import pandas as pd
 import pickle
 import os
+import json
 from surprise import Dataset, Reader
 import logging
 
@@ -334,6 +335,217 @@ class RestaurantDataPreprocessor:
         }
         return summary
     
+    def load_restaurant_json(self, file_path):
+        """
+        restaurants.json 파일을 로드
+        
+        Args:
+            file_path: JSON 파일 경로
+            
+        Returns:
+            list: 식당 데이터 리스트
+        """
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"파일을 찾을 수 없습니다: {file_path}")
+                
+            with open(file_path, 'r', encoding='utf-8') as f:
+                restaurant_data = json.load(f)
+                
+            logger.info(f"식당 JSON 데이터 로드 완료: {len(restaurant_data)}개 식당")
+            return restaurant_data
+            
+        except Exception as e:
+            logger.error(f"JSON 데이터 로드 중 오류: {e}")
+            raise
+
+    def extract_restaurant_features(self, restaurant_data):
+        """
+        JSON 데이터에서 필요한 필드만 추출하여 데이터프레임 생성
+        누락된 필드는 None으로 처리하여 데이터 보존
+        
+        Args:
+            restaurant_data: 식당 JSON 데이터 리스트
+            
+        Returns:
+            pd.DataFrame: 식당 정보 데이터프레임
+        """
+        try:
+            restaurants = []
+            
+            for restaurant in restaurant_data:
+                # 필요한 필드만 추출 (없으면 None)
+                extracted_data = {
+                    'id': restaurant.get('id'),
+                    'name': restaurant.get('name'),
+                    'category': restaurant.get('category'),
+                    'menu_average': restaurant.get('menu_average')
+                }
+                
+                # id나 name이 없는 경우만 스킵 (핵심 식별자)
+                if extracted_data['id'] is None or extracted_data['name'] is None:
+                    logger.warning(f"핵심 필드(id/name) 누락된 식당 스킵: {restaurant.get('name', 'Unknown')}")
+                    continue
+                    
+                restaurants.append(extracted_data)
+            
+            restaurant_df = pd.DataFrame(restaurants)
+            
+            # 데이터 타입 정리
+            if not restaurant_df.empty:
+                # menu_average는 숫자형으로 변환 (변환 불가능하면 NaN)
+                restaurant_df['menu_average'] = pd.to_numeric(restaurant_df['menu_average'], errors='coerce')
+            
+            logger.info(f"식당 데이터프레임 생성 완료: {len(restaurant_df)}개 식당")
+            
+            # 누락 데이터 현황 로그
+            missing_info = restaurant_df.isnull().sum()
+            if missing_info.any():
+                logger.info(f"누락 데이터 현황:\n{missing_info}")
+            
+            return restaurant_df
+        
+        except Exception as e:
+            logger.error(f"식당 데이터 추출 중 오류: {e}")
+            raise
+    
+    def prepare_content_features(self, restaurant_df):
+        """
+        콘텐츠 기반 필터링을 위한 특성 벡터 준비
+        NaN 값 처리 및 범주형 데이터 인코딩
+        
+        Args:
+            restaurant_df: 식당 데이터프레임
+            
+        Returns:
+            pd.DataFrame: 전처리된 특성 매트릭스
+        """
+        try:
+            df = restaurant_df.copy()
+            
+            # 1. menu_average 결측값 처리 (평균값으로 대체)
+            if df['menu_average'].isnull().any():
+                mean_price = df['menu_average'].mean()
+                df['menu_average'] = df['menu_average'].fillna(mean_price)
+                logger.info(f"menu_average 결측값을 평균값({mean_price:.0f})으로 대체")
+            
+            # 2. category 결측값 처리 (기타로 대체)
+            if df['category'].isnull().any():
+                df['category'] = df['category'].fillna('기타')
+                logger.info("category 결측값을 '기타'로 대체")
+            
+            # 3. category를 원-핫 인코딩
+            category_dummies = pd.get_dummies(df['category'], prefix='category')
+            
+            # 4. menu_average 정규화 (0-1 스케일)
+            df['menu_average_normalized'] = (df['menu_average'] - df['menu_average'].min()) / \
+                                        (df['menu_average'].max() - df['menu_average'].min())
+            
+            # 5. 최종 특성 매트릭스 구성
+            feature_matrix = pd.concat([
+                df[['id', 'name']],  # 식별자
+                category_dummies,    # 카테고리 원-핫 인코딩
+                df[['menu_average_normalized']]  # 정규화된 가격
+            ], axis=1)
+            
+            logger.info(f"콘텐츠 특성 매트릭스 생성 완료: {feature_matrix.shape}")
+            return feature_matrix
+            
+        except Exception as e:
+            logger.error(f"콘텐츠 특성 준비 중 오류: {e}")
+            raise
+
+    def save_restaurant_csv(self, restaurant_df, output_path):
+        """
+        식당 데이터프레임을 CSV 파일로 저장
+        
+        Args:
+            restaurant_df: 식당 데이터프레임
+            output_path: 저장할 CSV 파일 경로
+        """
+        try:
+            restaurant_df.to_csv(output_path, index=False, encoding='utf-8')
+            logger.info(f"식당 데이터 CSV 저장 완료: {output_path}")
+            
+        except Exception as e:
+            logger.error(f"식당 CSV 저장 중 오류: {e}")
+            raise
+
+    def process_restaurant_data(self, json_file_path, csv_output_path):
+        """
+        식당 JSON 데이터 전처리 파이프라인
+        JSON 파일에서 필요한 필드만 추출하여 CSV로 저장
+        
+        Args:
+            json_file_path: 입력 JSON 파일 경로
+            csv_output_path: 출력 CSV 파일 경로
+            save_content_features: 콘텐츠 특성 매트릭스 저장 여부
+            
+        Returns:
+            pd.DataFrame: 처리된 식당 데이터프레임
+        """
+        try:
+            logger.info("식당 데이터 전처리 파이프라인 시작")
+            
+            # 1. JSON 파일 로드
+            restaurant_data = self.load_restaurant_json(json_file_path)
+            
+            # 2. 필요한 필드 추출하여 데이터프레임 생성
+            restaurant_df = self.extract_restaurant_features(restaurant_data)
+            
+            # 3. CSV 파일로 저장
+            self.save_restaurant_csv(restaurant_df, csv_output_path)
+            
+            logger.info("식당 데이터 전처리 파이프라인 완료")
+            return restaurant_df
+            
+        except Exception as e:
+            logger.error(f"식당 데이터 전처리 중 오류: {e}")
+            raise
+    def save_content_features_csv(self, content_features_df, output_path):
+        """
+        콘텐츠 기반 필터링용 특성 매트릭스를 CSV 파일로 저장
+        
+        Args:
+            content_features_df: 콘텐츠 특성 매트릭스 데이터프레임
+            output_path: 저장할 CSV 파일 경로
+        """
+        try:
+            content_features_df.to_csv(output_path, index=False, encoding='utf-8')
+            logger.info(f"콘텐츠 특성 매트릭스 CSV 저장 완료: {output_path}")
+            
+        except Exception as e:
+            logger.error(f"콘텐츠 특성 CSV 저장 중 오류: {e}")
+            raise
+
+    def process_content_features_pipeline(self, restaurant_df, content_csv_output_path):
+        """
+        콘텐츠 기반 필터링용 특성 처리 파이프라인
+        특성 매트릭스 생성 후 CSV로 저장
+        
+        Args:
+            restaurant_df: 식당 데이터프레임
+            content_csv_output_path: 콘텐츠 특성 CSV 저장 경로
+            
+        Returns:
+            pd.DataFrame: 처리된 콘텐츠 특성 매트릭스
+        """
+        try:
+            logger.info("콘텐츠 특성 처리 파이프라인 시작")
+            
+            # 1. 콘텐츠 특성 매트릭스 생성
+            content_features = self.prepare_content_features(restaurant_df)
+            
+            # 2. CSV 파일로 저장
+            self.save_content_features_csv(content_features, content_csv_output_path)
+            
+            logger.info("콘텐츠 특성 처리 파이프라인 완료")
+            return content_features
+            
+        except Exception as e:
+            logger.error(f"콘텐츠 특성 처리 중 오류: {e}")
+            raise
+    
     def preprocessing_pipeline(self, input_file_path, mappings_output_path='restaurant_mappings.pkl', 
                           csv_output_path='svd_data.csv', surprise_output_path='surprise_dataset.pkl', 
                           save_csv=True, save_surprise=True):
@@ -406,7 +618,12 @@ if __name__ == "__main__":
     # 결과 폴더가 없으면 생성
     os.makedirs(result_dir, exist_ok=True)
     
-    input_file_path=os.path.join(data_dir, 'rating.xlsx')
+    # data path
+    rating_file_path=os.path.join(data_dir, 'rating.xlsx')
+    restaurant_json_path = os.path.join(data_dir, 'restaurants.json')
+    restaurant_csv_path = os.path.join(data_dir, 'restaurants.csv')
+    content_features_csv_path = os.path.join(data_dir, 'content_features.csv')
+    # result path 
     mappings_output_path=os.path.join(result_dir, 'restaurant_mappings.pkl')
     csv_output_path=os.path.join(result_dir, 'svd_data.csv')
     surprise_output_path=os.path.join(result_dir, 'surprise_dataset.pkl')
@@ -415,16 +632,39 @@ if __name__ == "__main__":
     preprocessor = RestaurantDataPreprocessor(rating_scale=(1, 5))
     
     try:
+        # 1. 식당 데이터 전처리
+        print("=== 식당 데이터 전처리 시작 ===")
+        restaurant_df = preprocessor.process_restaurant_data(
+            restaurant_json_path,
+            restaurant_csv_path
+        )
+        print(f"식당 데이터 처리 완료: {len(restaurant_df)}개 식당")
+        print("처리된 식당 데이터 샘플:")
+        print(restaurant_df.head())
+        
+        # 2. 콘텐츠 기반 필터링용 특성 처리 (추가)
+        print("\n=== 콘텐츠 특성 매트릭스 생성 시작 ===")
+        content_features = preprocessor.process_content_features_pipeline(
+            restaurant_df,
+            content_features_csv_path
+        )
+        print(f"콘텐츠 특성 매트릭스 생성 완료: {content_features.shape}")
+        print("특성 컬럼:", content_features.columns.tolist())
+        print("콘텐츠 특성 매트릭스 샘플:")
+        print(content_features.head())
+
+        # 3. 평점 데이터 전처리
+        print("\n=== 평점 데이터 전처리 시작 ===")
         svd_data, surprise_dataset, summary = preprocessor.preprocessing_pipeline(
-            input_file_path,
+            rating_file_path,
             mappings_output_path,
             csv_output_path,
-            surprise_output_path,  # 추가
+            surprise_output_path,
             save_csv=True,
-            save_surprise=True  # 추가
+            save_surprise=True
         )
         
-        print("전처리 완료!")
+        print("평점 데이터 전처리 완료!")
         print(f"데이터 요약: {summary}")
         
     except Exception as e:
