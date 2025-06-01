@@ -1,0 +1,307 @@
+id,name,category_기타,category_멕시칸,category_분식,category_아시안,category_양식,category_일식,category_중식,category_한식,menu_average_normalized
+1153948254,우희 본점,False,False,False,False,False,False,False,True,0.5182361544574068
+1657246999,직화장인 신당본점,False,False,False,False,False,False,False,True,0.08061451291559661
+31161142,도치피자 장충,True,False,False,False,False,False,False,False,0.14683357709626524
+11723986,뚱뚱이할머니집,False,False,False,False,False,False,False,True,0.26487625672267456
+11611561,평안도족발집,False,False,False,False,False,False,False,True,0.1708221528681492
+1516466403,콩365,False,False,False,True,False,False,False,False,0.06737070007946287
+1650673771,봉래축산 장충점,False,False,False,False,False,False,False,True,0.3282162311563576
+1404397407,함흥에겨울냉면,False,False,False,False,False,False,False,True,0.0587334308385061
+11710164,원조1호장충동할머니집,False,False,False,False,False,False,False,True,0.11012518282219894
+13152812,별내옥설농탕,False,False,False,False,False,False,False,True,0.18809669135006277
+1903023312,평강삼계탕 장충점,True,False,False,False,False,False,False,False,0.14395448734927965
+1282789107,우레카츠,False,False,False,False,False,True,False,False,0.09155505395414186
+11727395,송원,False,False,False,False,False,False,False,True,0.19577810279502034
+1683808602,한와담 가든,True,False,False,False,False,False,False,False,0.18617921757857037
+1085935559,크랩회피쉬 장충동본점,False,False,False,False,False,True,False,False,0.2936671541925305
+1748813102,야마부키,False,False,False,False,False,True,False,False,1.0
+1923216048,러플리버거,False,False,False,False,True,False,False,False,0.0247601718240761
+1478209881,팔팔식당 동대입구역점,False,False,False,False,False,True,False,False,0.04729768636347932
+1294003190,희희카츠 충무로점,False,False,False,False,False,True,False,False,0.040307256457798306
+19963784,옥천매운족발,False,False,False,False,False,False,False,True,0.11899853742240853
+13154985,맹산식당,False,False,False,False,False,False,False,True,0.04721707185056372
+1442021510,우리예술,False,False,False,False,False,False,False,True,0.06251655476604517
+18054951,장충동진두부집,True,False,False,False,False,False,False,False,0.18387594578098188
+33510647,평남할머니집,False,False,False,False,False,False,False,True,0.1258565291997282
+1824062038,남소영가마솥,False,False,False,False,False,False,False,True,0.11286031808183525
+1863614762,든든별식,False,False,False,False,False,False,False,True,0.04145889235659254
+34268603,수릿날 설렁탕 할매 족발보쌈,False,False,False,False,False,False,False,True,0.14203125539829328
+13160672,덕화장,False,False,False,False,False,False,True,False,0.05182361544574068
+20873674,아시아,False,False,False,True,False,False,False,False,0.02879089746985593
+18055227,돈돈돈까스,False,False,False,False,False,True,False,False,0.06580447525710272
+1126991552,장충동비비,True,False,False,False,False,False,False,False,0.09788905139751017
+20900430,남원본가추어탕 장충동점,False,False,False,False,False,False,False,True,0.16942291525111422
+37556077,2점5 닭갈비,True,False,False,False,False,False,False,False,0.05182361544574068
+13578191,평양면옥,False,False,False,False,False,False,False,True,0.1521771676666705
+1209779910,고젠,False,False,False,False,False,True,False,False,0.09500996165052457
+11678838,필동면옥,False,False,False,False,False,False,False,True,0.08853200971980699
+1704043572,우대포 블랙명동점,False,False,False,False,False,False,False,True,0.2072944617829627
+37036817,더식당 명동본점,False,False,False,False,False,False,False,True,0.17207167781834096
+1029283004,태태삼겹 신당 2호점,False,False,False,False,False,False,False,True,0.08061451291559661
+38276255,진아네 떡볶이,False,False,False,False,False,False,False,True,0.017274538481913557
+1777182536,콘드에뻬뻬,False,False,False,False,True,False,False,False,0.06909815392765423
+1161958168,아스론가,False,False,False,False,True,False,False,False,0.11631522577821796
+11679381,우래옥,False,False,False,False,False,False,False,True,0.07485633342162541
+1062788912,서울은마꽈배기 장충점,True,False,False,False,False,False,False,False,0.0
+1874271422,금성회관 약수역직영점,False,False,False,False,False,False,False,True,0.0930867296995382
+1966616178,한암동 을지점,False,False,False,False,False,False,False,True,0.39961765688160034
+13166754,서울신라호텔 더 파크뷰,True,False,False,False,False,False,False,False,0.8437921066875497
+1225000296,더타코부스 을지로점,False,True,False,False,False,False,False,False,0.07531698778114311
+1498236014,우온소곱창,False,False,False,False,False,False,False,True,0.05105201939354854
+21732689,빕스 제일제당센터점,False,False,False,False,True,False,False,False,0.18977232158280838
+11680069,만포막국수,True,False,False,False,False,False,False,False,0.09500996165052457
+11728126,백제정육점,False,False,False,False,False,False,False,True,0.1577741181348105
+33878641,우정,False,False,False,False,False,False,False,True,0.04462589107827669
+1702312024,우야재 남산,False,False,False,False,False,False,False,True,0.18426174380707797
+11824865,롯데리아 동대문역사문화공원역점,False,False,False,False,True,False,False,False,0.04606543595176949
+1514444516,계진상 동대문현대시티아울렛점,False,False,False,False,False,False,False,True,0.10498888671357663
+1365727258,녹지 종로직영점,False,False,False,False,False,False,False,True,0.17850356431310677
+1709664208,을지로칼국수 낙원의소바,False,False,False,False,False,False,False,True,0.08191010330174012
+38425640,필동함박 충무로 본점,False,False,False,False,True,False,False,False,0.05470270519272627
+1414550429,필동카츠,False,False,False,False,False,True,False,False,0.049773703545886935
+18051039,동대닭한마리 본점,False,False,False,False,False,False,False,True,0.03454907696382711
+1379257328,시오,False,False,False,False,False,False,False,True,0.12667994886736608
+1256930702,정성순대 서울 충무로점,False,False,False,False,False,False,False,True,0.06026510658390243
+1871154622,카츠공방 충무로역점,False,False,False,False,False,True,False,False,0.07485633342162541
+1039481463,싱싱오징어바다 충무로점,True,False,False,False,False,False,False,False,0.3032602812294865
+11710924,홍탁집,False,False,False,False,False,False,False,True,0.14337866939988253
+1213596200,옥된장 충무로역점,False,False,False,False,False,False,False,True,0.2015362822889915
+1290765626,맘스터치 동국대점,False,False,False,False,True,False,False,False,0.03097900567756498
+1224219974,백수씨 심야식당 충무로점,False,False,False,False,False,False,False,True,0.14395448734927965
+1253709106,하얀집 2호점,False,False,False,False,False,False,False,True,0.027639261571061693
+1653520109,하얀집 1호점,False,False,False,False,False,False,False,True,0.03358746098833393
+1249013838,라화방마라탕 동국대점,False,False,False,False,False,False,True,False,0.015351306530927183
+1903221041,숙희,True,False,False,False,False,False,False,False,0.06717492197666786
+11729122,옛날농장 충무로점,False,False,False,False,False,False,False,True,0.12667994886736608
+38521927,보스호프 충무로본점,True,False,False,False,False,False,False,False,0.09826909124411226
+1894997278,은화수식당 동국대점,False,False,False,False,False,True,False,False,0.04606543595176949
+1084309992,만나손칼국수,False,False,False,False,False,False,False,True,0.05758179493971186
+36188913,죠티인도레스토랑,False,False,False,True,False,False,False,False,0.05362016744785968
+1184410740,하얀집 3호점,False,False,False,False,False,False,False,True,0.014395448734927966
+1026229879,샹츠마라 동국대점,True,False,False,False,False,False,False,False,0.016888740455817487
+1910093167,금붕어,True,False,False,False,False,False,False,False,0.020153628228899153
+1260647442,앤딩,True,False,False,False,False,False,False,False,0.1597894809577004
+1577018775,술무로,False,False,False,False,False,False,False,True,0.07715960521921389
+1115510176,진양양꼬치,True,False,False,False,False,False,False,False,0.16122902583119322
+18044039,황토골 충무로역본점,False,False,False,False,False,False,False,True,0.0834936026625822
+1977740975,오이드킨,False,False,False,False,False,True,False,False,0.07965289694010341
+1122376933,행복은간장밥 동국대점,False,False,False,False,False,False,False,True,0.03973143850840118
+21070363,손문대구막창 동국대점,False,False,False,False,False,False,False,True,0.05182361544574068
+1364409508,본죽&비빔밥cafe 충무로역점,False,False,False,False,False,False,False,True,0.09253970264761092
+1253387841,올디스타코 을지로 본점,False,True,False,False,False,False,False,False,0.01669872053251644
+1445744498,어나더레벨,False,False,False,False,False,False,False,True,0.10364723089148135
+1818576119,용가회전훠궈 명동점,False,False,False,False,False,False,True,False,0.10019232319509863
+1833732228,인도음식점 타지 명동성당점,False,False,False,True,False,False,False,False,0.13128649246254304
+1201820288,1979 종점 을지로점,False,False,False,False,False,False,False,True,0.07197724367463983
+1729106110,한사발포차 종각점,False,False,False,False,False,False,False,True,0.11506570082802621
+2071461424,삼삼뼈국 충무로점,False,False,False,False,False,False,False,True,0.06737070007946287
+1100825069,까이9,False,False,False,True,False,False,False,False,0.10076814114449575
+36868623,명동정,False,False,False,False,False,False,False,True,0.3650685799177732
+1436645496,을지로야장 을지로 라스베가스,False,False,False,False,False,True,False,False,0.13704467195651424
+1130184843,목멱산방 남산타워점,False,False,False,False,False,False,False,True,0.05091382308569323
+11760894,김가네 동국대점,True,False,False,False,False,False,False,False,0.02261812905231882
+1711457858,아리계곡 종각점,False,False,False,False,False,False,False,True,0.08212891412251103
+1249798422,설문동본갈비 을지로점,False,False,False,False,False,False,False,True,0.3038360991788836
+38548617,아지트,True,False,False,False,False,False,False,False,0.05988506673730033
+1567345635,숙달돼지 종각점,False,False,False,False,False,False,False,True,0.08061451291559661
+19866570,오장동함흥냉면,False,False,False,False,False,False,False,True,0.09148595580021421
+1196907375,갓잇 을지로점,False,True,False,False,False,False,False,False,0.2072944617829627
+11678488,오장동흥남집 본점,False,False,False,False,False,False,False,True,0.06909815392765423
+1790378051,도야집 을지로점,False,False,False,False,False,False,False,True,0.15738832010871442
+1510468143,호앙비엣 을지로점,False,False,False,True,False,False,False,False,0.05028618152085037
+19927542,더 킹스,True,False,False,False,False,False,False,False,0.7831124111800813
+1323525758,진작,False,False,False,False,False,True,False,False,0.10114818099109786
+11816541,충무로쭈꾸미불고기 충무로본점,False,False,False,False,False,False,False,True,0.0882901661810602
+1224059959,타코멕스,False,True,False,False,False,False,False,False,0.24702590029136387
+1473119375,아재카세 충무로점,False,False,False,False,False,False,False,True,0.2643004387732774
+1764418860,회성댁,False,False,False,False,False,True,False,False,0.15086430274204507
+1768639391,영동골방,False,False,False,False,False,False,False,True,0.13627307590432208
+1538911146,보틀러,False,False,False,False,True,False,False,False,0.09788905139751017
+1827161108,박지후스시,False,False,False,False,False,True,False,False,0.040307256457798306
+11715055,한국의집,False,False,False,False,False,False,False,True,0.990406872963044
+1273211996,청기와타운 충무로점,False,False,False,False,False,False,False,True,0.11516358987942373
+1948933041,바오서울 충무로,False,False,False,True,False,False,False,False,0.04592148146442021
+1835052467,남산도담,False,False,False,False,False,False,False,True,0.09500996165052457
+2041488467,멘츠루 을지로점,False,False,False,False,False,True,False,False,0.06909815392765423
+1490602564,콸콸,False,False,False,False,True,False,False,False,0.07208089090553131
+1395864516,강탄 을지로점,False,False,False,False,False,False,False,True,0.04567963792567342
+11723989,뚱보식당,False,False,False,False,False,False,False,True,0.0495203436481522
+1440641712,용용선생 종각점,False,False,False,False,False,False,False,True,0.0781154630152131
+1888220096,신승호라멘집,False,False,False,False,False,True,False,False,0.040307256457798306
+37402288,피제이레스토랑,True,False,False,False,False,False,False,False,0.07168933469994127
+1397313807,장작집 을지로점,False,False,False,False,False,False,False,True,0.1416512155516912
+11720161,사랑방칼국수,False,False,False,False,False,False,False,True,0.053147996729354045
+1558746318,진심,False,False,False,False,False,False,False,True,0.027351352596363135
+1700640711,태화루,False,False,False,False,False,False,True,False,0.030898391164649385
+34542140,오매가매 충무로점,False,False,False,False,False,False,False,True,0.21593173102391947
+1825107190,도우또,False,False,False,False,False,True,False,False,0.06780256354151072
+19777284,평래옥,False,False,False,False,False,False,False,True,0.06333997443368304
+1598197649,부여식품 장금이대구막창,False,False,False,False,False,False,False,True,0.047343751799431094
+1058965772,을지잔치,False,False,False,False,False,False,False,True,0.08459917312542467
+1799596430,행2PM8PM,True,False,False,False,False,False,False,False,0.10940541038545254
+1229984226,온의미반,False,False,False,False,False,False,False,True,0.06621906418066864
+11592593,진고개,False,False,False,False,False,False,False,True,0.14683357709626524
+1008495298,별미집 닭곰탕,False,False,False,False,False,False,False,True,0.05839945642785577
+1063757405,자야,True,False,False,False,False,False,False,False,0.07485633342162541
+1519874731,빠삼,False,False,False,False,False,False,False,True,0.17562447456612118
+20927098,오발탄 충무로점,False,False,False,False,False,False,False,True,0.23608535925281862
+1244251260,잊지마식당,False,False,False,False,False,False,False,True,0.02879089746985593
+1568702755,극동골뱅이,True,False,False,False,False,False,False,False,0.09097923600474474
+36868416,순남시래기 충무로점,False,False,False,False,False,False,False,True,0.03454907696382711
+37676634,김치만선생 동대필동점,False,False,False,False,False,False,False,True,0.023032717975884746
+1098459145,초불집,False,False,False,False,False,False,False,True,0.12667994886736608
+31390645,필동족발,False,False,False,False,False,False,False,True,0.21881082077090508
+1148721944,을지로보석,False,False,False,False,False,True,False,False,0.10940541038545254
+1719015476,을지로술집,False,False,False,False,False,False,False,True,0.21305264127693388
+1755459807,호빈,False,False,False,False,False,False,True,False,0.9155505395414186
+37489777,동대문엽기떡볶이 충무로점,True,False,False,False,False,False,False,False,0.07851853557979109
+1737664684,한남북엇국 필동점,False,False,False,False,False,False,False,True,0.18656501560466643
+1885265706,오하이요 을지로3가점,False,False,False,False,False,True,False,False,0.05738601683691684
+1601993763,촙촙,False,False,False,True,False,False,False,False,0.05758179493971186
+36105152,상우가든,False,False,False,False,False,False,False,True,0.06909815392765423
+1468943519,실비식당,False,False,True,False,False,False,False,False,0.06498105558946483
+1111362713,을지로 우희 본점,False,False,False,False,False,False,False,True,0.24184353874678982
+1384582401,금토일샴페인빠,False,False,False,False,True,False,False,False,0.06190042956019025
+1887919685,아따 을지로점,False,False,False,False,False,False,False,True,0.1602674098557
+1400371821,종로계림닭도리탕 충무로직영점,False,False,False,False,False,False,False,True,0.14971266684325082
+1939654048,계업식,False,False,False,False,False,False,False,True,0.07449356811350523
+1161069141,멘텐,False,False,False,False,False,True,False,False,0.04606543595176949
+1130033763,코야바x야장포차,False,False,False,False,False,False,False,True,0.07043980974974952
+1852989731,자은동,False,False,False,False,False,False,False,True,0.10268561491598815
+11724795,오장동부산숯불갈비,False,False,False,False,False,False,False,True,0.13407920951711907
+13526656,본가원조닭한마리,False,False,False,False,False,False,False,True,0.05758179493971186
+1878658216,샤오리앤,False,False,False,False,False,False,True,False,0.23608535925281862
+1202714162,설규일식,False,False,False,False,False,True,False,False,0.19884721246530696
+20421452,충무로족발,False,False,False,False,False,False,False,True,0.22456900026487625
+1101323127,화육계,False,False,False,False,False,False,False,True,0.1583499360842076
+1026475087,aff seoul,False,False,False,False,True,False,False,False,0.10896203056441675
+1069889681,요오,False,False,False,False,False,True,False,False,0.06621906418066864
+1391921509,동래정 충무로점,False,False,False,False,False,False,False,True,0.08061451291559661
+1010242712,경성순대국,False,False,False,False,False,False,False,True,0.0839715315605818
+13154031,충무오뎅,False,False,False,False,False,True,False,False,0.05182361544574068
+1545695294,해든 충무로본점,False,False,False,False,False,False,False,True,0.10364723089148135
+13537864,뮌헨호프,True,False,False,False,False,False,False,False,0.06890237582485921
+1455030832,을지로 딜런 위스키 하이볼 혼술 LP,False,False,False,False,True,False,False,False,0.06717492197666786
+1369289029,을지타이,False,False,False,True,False,False,False,False,0.06973731185148503
+1569669001,을지로 볼,False,False,False,False,False,False,False,True,0.08253198668708901
+491496915,더 시옷,False,False,False,False,True,False,False,False,0.24184353874678982
+37822083,명품을지순대국,False,False,False,False,False,False,False,True,0.0431863462047839
+1003545719,주마등,False,False,False,False,False,False,False,True,0.11598125136756764
+627840384,인현 해물,True,False,False,False,False,False,False,False,0.13243812836133728
+1283997031,평균율,True,False,False,False,False,False,False,False,0.09788905139751017
+1131727748,육회관포차 을지로점,False,False,False,False,False,False,False,True,0.19001992330104914
+1625974889,룽키,False,False,False,False,False,False,True,False,0.06801561618278765
+1149107484,진미네,False,False,False,False,False,False,False,True,0.09788905139751017
+1163354380,153구포국수 충무로점,False,False,False,False,False,False,False,True,0.02360853592528186
+1736184681,오코노미야끼 정화,False,False,False,False,False,True,False,False,0.06909815392765423
+1430034056,리브로,True,False,False,False,False,False,False,False,0.09285064434028538
+1504347474,을지로 와이너리,False,False,False,False,True,False,False,False,0.09884490919350938
+1487081318,필동해물,False,False,False,False,False,False,False,True,0.18426174380707797
+1752086762,을지로회관,False,False,False,False,False,False,False,True,0.2092119355544551
+1030835435,하타네 을지로본점,False,False,False,False,False,True,False,False,0.09040341805534761
+20866000,서울뚝배기,False,False,False,False,False,False,False,True,0.07946287701680237
+1724618660,골수,False,False,False,False,False,False,False,True,0.06593115520597008
+1037217659,존라멘,False,False,False,False,False,True,False,False,0.03224580516623864
+1851216510,충무물갈비 본점,False,False,False,False,False,False,False,True,0.0431863462047839
+1796383109,을지 작업장,False,False,False,False,False,False,False,True,0.12667994886736608
+1960104329,와타루,False,False,False,False,False,True,False,False,0.14587196112077205
+13490546,지우갈비 명동본점,False,False,False,False,False,False,False,True,0.32245805166238645
+1278049062,육석관,False,False,False,False,False,False,False,True,0.1272557668167632
+31243503,창고43 명동점,True,False,False,False,False,False,False,False,0.39501111328642335
+1763904077,옥수동화덕피자 종각,False,False,False,False,True,False,False,False,0.09500996165052457
+1733573733,참치공방 정다운점,False,False,False,False,False,True,False,False,0.2044153720359771
+1881019679,돗제,False,False,False,False,False,False,False,True,0.09788905139751017
+1266964465,올디스타코 을지로 2호점,False,True,False,False,False,False,False,False,0.01669872053251644
+1192717326,황평집닭곰탕,False,False,False,False,False,False,False,True,0.15418677231006644
+1588565451,스무스 서울,False,False,False,False,True,False,False,False,0.06679488213006576
+1353673506,수월가,False,False,False,False,False,False,False,True,0.2220987412619626
+1992581937,요미우돈교자 을지로점,False,False,False,False,False,True,False,False,0.0559349556044361
+18085955,산수갑산,False,False,False,False,False,False,False,True,0.11372404500593092
+1946183790,우메돈,False,False,False,False,False,True,False,False,0.0863726924095678
+18079276,동원집,False,False,False,False,False,False,False,True,0.10019232319509863
+11711740,오장갈비,False,False,False,False,False,False,False,True,0.19049785219904875
+31608027,바로 파스타마켓,False,False,False,False,True,False,False,False,0.07923254983704352
+1806552031,인현골방,False,False,False,False,True,False,False,False,0.06141674248269667
+31111288,그릴데미그라스,False,False,False,False,True,False,False,False,0.10940541038545254
+1204877915,누에파스타하우스,False,False,False,False,True,False,False,False,0.10730943304964702
+1830372539,을지로야키토리 토리노 라스베가스,False,False,False,False,False,True,False,False,0.18617921757857037
+1291281205,게미식당,True,False,False,False,False,False,False,False,0.2015362822889915
+1159809835,콘부,False,False,False,False,False,True,False,False,0.062222887611852636
+1798960514,솔라고 뷔페 레스토랑,True,False,False,False,False,False,False,False,0.12034595142399779
+1877624697,붓골집 필동점,False,False,False,False,False,False,False,True,0.10134395909389288
+1963662493,이랑,False,False,False,False,False,False,False,True,0.09788905139751017
+18043048,충무로칼국수,False,False,False,False,False,False,False,True,0.02879089746985593
+1344242919,버거킹 충무로역점,False,False,False,False,True,False,False,False,0.03447422063040549
+1491545908,을지만돈,True,False,False,False,False,False,False,False,0.1882924694528578
+20881436,송림우렁쌈밥,False,False,False,False,False,False,False,True,0.060460884686697455
+1893375679,성수라 을지로점,False,False,False,False,False,False,False,True,0.10748217843446616
+1060664440,을지상회,False,False,False,False,False,False,False,True,0.07896767358032085
+1856507315,네평반,False,False,False,True,False,False,False,False,0.6156012115209656
+11592607,영덕회식당,False,False,False,False,False,True,False,False,0.16506397337417802
+37017335,치아바타 몽스,True,False,False,False,False,False,False,False,0.06895419944030495
+1606362950,우물집 명동점,False,False,False,False,False,False,False,True,0.14523280319694126
+18034869,일식성진,False,False,False,False,False,True,False,False,0.403072564577983
+1707734593,우기식당 바다 을지로점,False,False,False,False,False,True,False,False,0.26343671184918177
+19790351,동방명주 충무로점,False,False,False,False,False,False,True,False,0.22994138173275136
+11623202,복정집,False,False,False,False,False,False,False,True,0.05758179493971186
+2042352500,구전,False,False,False,False,False,False,False,True,0.11516358987942373
+1279278264,저저,False,False,False,False,False,False,False,True,0.04606543595176949
+11723865,동경우동,False,False,False,False,False,True,False,False,0.01791369640574436
+1225907287,남산김밥,True,False,False,False,False,False,False,False,0.008637269240956778
+1889242617,베타서비스,False,False,False,False,False,False,False,True,0.1641081155781788
+11727216,명화당 명동1호점,False,False,True,False,False,False,False,False,0.019048057766056684
+20835039,신세계분식,False,False,True,False,False,False,False,False,0.011706378911243421
+1960601663,광화문수제비,False,False,False,False,False,False,False,True,0.02879089746985593
+19971826,모녀김밥,True,False,False,False,False,False,False,False,0.04277175728121797
+37936207,원조누드치즈김밥,True,False,False,False,False,False,False,False,0.005758179493971186
+1192169754,신세계떡볶이,False,False,False,False,False,False,False,True,0.005758179493971186
+11699378,명동충무김밥,True,False,False,False,False,False,False,False,0.04606543595176949
+1397917363,채움 김밥전문점,True,False,False,False,False,False,False,False,0.0251402116706782
+1113883660,영자씨우동김밥,False,False,True,False,False,False,False,False,0.011130560961846303
+11679550,틈새라면 명동본점,True,False,False,False,False,False,False,False,0.015213110223071874
+38274999,김밥나라 충무로점,True,False,False,False,False,False,False,False,0.029199728213927884
+1047454785,김밥킹 을지로시그니처타워점,True,False,False,False,False,False,False,False,0.020890675204127462
+1759221815,싸다김밥 명동역점,True,False,False,False,False,False,False,False,0.02902698282910875
+1314441918,장충떡볶이,False,False,True,False,False,False,False,False,0.012178549629749059
+1201458226,라밥 종로점,False,False,True,False,False,False,False,False,0.011170868218304101
+38563005,김밥일번가,True,False,False,False,False,False,False,False,0.002879089746985593
+1194565227,낭만김밥,True,False,False,False,False,False,False,False,0.01776974191839508
+1531973282,왕순이김밥 동국대점,False,False,True,False,False,False,False,False,0.011228450013243813
+1261787029,칼누들바 종각점,False,False,False,False,False,False,False,True,0.07341678854813262
+1373635854,수학쌤김밥,True,False,False,False,False,False,False,False,0.005758179493971186
+145766958,늘솜김밥,True,False,False,False,False,False,False,False,0.010364723089148134
+11710170,아이러브신당동,False,False,False,False,False,False,False,True,0.05662017896421867
+1792163901,플레김밥&카페,True,False,False,False,False,False,False,False,0.06487165017907938
+1879509700,이모분식,False,False,True,False,False,False,False,False,0.02926882636785554
+1327089047,박가네 육회,False,False,False,False,False,False,False,True,0.11516358987942373
+1852559484,임도영의현미자연나라,False,False,False,False,False,False,False,True,0.013433832759434777
+1590206816,해밀가 종각점,False,False,False,False,False,False,False,True,0.15547084633722202
+1546529826,라밥 회현점,False,False,True,False,False,False,False,False,0.015927124480324302
+1540160101,통통김밥 남대문시장점,True,False,False,False,False,False,False,False,0.011516358987942373
+11727832,얼큰수제비 본점,False,False,False,False,False,False,False,True,0.011925189732014327
+1269454261,우리김밥,True,False,False,False,False,False,False,False,0.005758179493971186
+1181083953,쉐프가만든떡볶이,False,False,False,False,False,False,False,True,0.009017309087558878
+1491803342,두루미분식 N서울타워점,False,False,True,False,False,False,False,False,0.13819630785530845
+452657895,현선이네 청계즉석점,False,False,False,False,False,False,False,True,0.10748217843446616
+1629136133,일월스낵 던던 동대문점,False,False,True,False,False,False,False,False,0.07485633342162541
+13527033,왕비집 명동본점,False,False,False,False,False,False,False,True,0.27831008948210934
+31729017,먹보대장,False,False,False,False,False,False,False,True,0.014873377632927573
+18066414,조일식품,False,False,True,False,False,False,False,False,0.017274538481913557
+1299908979,싸다김밥 동대문2호점,True,False,False,False,False,False,False,False,0.022646919949788676
+38522603,멸치국수 맛있는집,False,False,False,False,False,False,False,True,0.015259175659023643
+31894752,마포만두 시청점,True,False,False,False,False,False,False,False,0.011130560961846303
+11711990,명동할머니국수본점,True,False,False,False,False,False,False,False,0.022646919949788676
+1566022488,소풍,False,False,True,False,False,False,False,False,0.007197724367463983
+1215402405,김가네 명동역점,True,False,False,False,False,False,False,False,0.02467379913166653
+1021740363,우일뭉티기,False,False,False,False,False,False,False,True,0.30210864533069226
+1917207041,동대문매운김밥,False,False,True,False,False,False,False,False,0.03570071286262135
+37588254,독일분식 을지로입구지하쇼핑센터점,False,False,True,False,False,False,False,False,0.018040376354611726
+18029374,김밥천국 명동본점,True,False,False,False,False,False,False,False,0.012472216783941588
+20735482,남이분식,False,False,True,False,False,False,False,False,0.017533656559142262
+1513347011,라밥 시청점,False,False,True,False,False,False,False,False,0.008925178215655338
+1002400057,뽁 현대아울렛 동대문점,True,False,False,False,False,False,False,False,0.02360853592528186
+38563515,엔돌핀김밥,True,False,False,False,False,False,False,False,0.017274538481913557
+38232990,예술김밥 본점,True,False,False,False,False,False,False,False,0.014775488581530064
+1229435365,상아식당,False,False,False,False,False,False,False,True,0.08546290004952034
+1252102220,담아김밥,False,False,True,False,False,False,False,False,0.022071102000391557
+36428555,부촌육회 본점,False,False,False,False,False,False,False,True,0.1281194937408589
