@@ -1,17 +1,18 @@
-
 import pandas as pd
 import pickle
 import os
 import json
+import re
 from surprise import Dataset, Reader
 import logging
+from difflib import SequenceMatcher
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class RestaurantDataPreprocessor:
-    """식당 평점 데이터 전처리 및 SVD++ 데이터 생성 파이프라인"""
+class ImprovedRestaurantDataPreprocessor:
+    """개선된 식당 평점 데이터 전처리 - 실제 ID 기준 매핑"""
     
     def __init__(self, rating_scale=(1, 5)):
         """
@@ -21,16 +22,125 @@ class RestaurantDataPreprocessor:
         self.rating_scale = rating_scale
         self.restaurant_mapping = None
         self.restaurant_reverse_mapping = None
+        self.restaurants_df = None
         
+    def load_restaurants_data(self, restaurants_csv_path):
+        """
+        restaurants.csv 로드 (크롤링된 실제 식당 데이터)
+        """
+        try:
+            if not os.path.exists(restaurants_csv_path):
+                raise FileNotFoundError(f"파일을 찾을 수 없습니다: {restaurants_csv_path}")
+                
+            self.restaurants_df = pd.read_csv(restaurants_csv_path)
+            logger.info(f"식당 데이터 로드 완료: {len(self.restaurants_df)}개 식당")
+            
+            # 데이터 정보 출력
+            logger.info(f"식당 데이터 컬럼: {list(self.restaurants_df.columns)}")
+            logger.info(f"샘플 식당명: {self.restaurants_df['name'].head(3).tolist()}")
+            
+            return self.restaurants_df
+            
+        except Exception as e:
+            logger.error(f"식당 데이터 로드 중 오류: {e}")
+            raise
+    
+    def similarity_score(self, str1, str2):
+        """
+        두 문자열 간의 유사도 계산
+        """
+        return SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+    
+    def normalize_restaurant_name(self, name):
+        """
+        식당명 정규화 (매칭 정확도 향상)
+        """
+        if pd.isna(name):
+            return ""
+        
+        # 1. 소문자 변환
+        normalized = name.lower()
+        
+        # 2. 특수문자 및 공백 제거
+        normalized = re.sub(r'[^\w가-힣]', '', normalized)
+        
+        # 3. 흔한 접미사 제거
+        suffixes = ['본점', '직영점', '점', '지점', '매장', '역점', '점포']
+        for suffix in suffixes:
+            if normalized.endswith(suffix):
+                normalized = normalized[:-len(suffix)]
+                break
+        
+        return normalized.strip()
+    
+    def find_matching_restaurant_id(self, survey_name, min_similarity=0.6):
+        """
+        설문 식당명에 매칭되는 restaurants.csv의 실제 ID 찾기
+        
+        Args:
+            survey_name: 설문에서 입력받은 식당명
+            min_similarity: 최소 유사도 임계값
+            
+        Returns:
+            int: 매칭된 식당의 실제 ID, 매칭 실패시 None
+        """
+        if pd.isna(survey_name) or survey_name.strip() == "":
+            return None
+        
+        survey_normalized = self.normalize_restaurant_name(survey_name)
+        
+        # 1단계: 정확한 매칭 시도
+        for _, restaurant_row in self.restaurants_df.iterrows():
+            restaurant_normalized = self.normalize_restaurant_name(restaurant_row['name'])
+            
+            if survey_normalized == restaurant_normalized:
+                logger.debug(f"정확 매칭: '{survey_name}' → '{restaurant_row['name']}' (ID: {restaurant_row['id']})")
+                return restaurant_row['id']
+        
+        # 2단계: 포함 관계 매칭
+        best_match = None
+        best_score = 0
+        best_restaurant_name = ""
+        
+        for _, restaurant_row in self.restaurants_df.iterrows():
+            restaurant_normalized = self.normalize_restaurant_name(restaurant_row['name'])
+            
+            # 설문명이 식당명에 포함되거나 그 반대
+            if len(survey_normalized) >= 2:
+                if survey_normalized in restaurant_normalized:
+                    score = len(survey_normalized) / len(restaurant_normalized)
+                    if score > best_score:
+                        best_score = score
+                        best_match = restaurant_row['id']
+                        best_restaurant_name = restaurant_row['name']
+                
+                elif restaurant_normalized in survey_normalized:
+                    score = len(restaurant_normalized) / len(survey_normalized)
+                    if score > best_score and score > 0.4:  # 최소 40% 일치
+                        best_score = score
+                        best_match = restaurant_row['id']
+                        best_restaurant_name = restaurant_row['name']
+        
+        # 3단계: 유사도 기반 매칭
+        if best_match is None:
+            for _, restaurant_row in self.restaurants_df.iterrows():
+                similarity = self.similarity_score(survey_name, restaurant_row['name'])
+                
+                if similarity > best_score and similarity >= min_similarity:
+                    best_score = similarity
+                    best_match = restaurant_row['id']
+                    best_restaurant_name = restaurant_row['name']
+        
+        if best_match:
+            logger.debug(f"유사 매칭: '{survey_name}' → '{best_restaurant_name}' (ID: {best_match}, 유사도: {best_score:.3f})")
+            return best_match
+        
+        logger.warning(f"매칭 실패: '{survey_name}' - 유사한 식당을 찾을 수 없습니다")
+        return None
+    
     def load_raw_data(self, file_path):
         """
         원본 엑셀 파일을 로드
-        
-        Args:
-            file_path: 엑셀 파일 경로
-            
-        Returns:
-            pd.DataFrame: 원본 데이터
         """
         try:
             if not os.path.exists(file_path):
@@ -47,12 +157,6 @@ class RestaurantDataPreprocessor:
     def clean_columns(self, data):
         """
         필요없는 컬럼 제거
-        
-        Args:
-            data: 원본 데이터프레임
-            
-        Returns:
-            pd.DataFrame: 정리된 데이터
         """
         try:
             # 제거할 컬럼 인덱스 (타임스탬프, 추가입력여부, 개인정보 관련)
@@ -69,12 +173,6 @@ class RestaurantDataPreprocessor:
     def extract_restaurant_rating_data(self, data):
         """
         식당 이름과 평점 데이터를 분리 추출
-        
-        Args:
-            data: 정리된 데이터프레임
-            
-        Returns:
-            tuple: (식당 이름 데이터, 평점 데이터)
         """
         try:
             # 식당 이름 컬럼 (0, 2, 4, 6, 8번째)
@@ -95,13 +193,6 @@ class RestaurantDataPreprocessor:
     def convert_to_long_format(self, restaurants, ratings):
         """
         Wide format을 Long format으로 변환
-        
-        Args:
-            restaurants: 식당 이름 데이터
-            ratings: 평점 데이터
-            
-        Returns:
-            pd.DataFrame: Long format 데이터
         """
         try:
             user_data = []
@@ -115,7 +206,7 @@ class RestaurantDataPreprocessor:
                     if pd.notna(restaurant_name) and pd.notna(rating_score):
                         user_data.append({
                             'user_id': user_id,
-                            'restaurant_name': restaurant_name,
+                            'restaurant_name': restaurant_name.strip(),
                             'rating': float(rating_score)
                         })
             
@@ -127,53 +218,130 @@ class RestaurantDataPreprocessor:
             logger.error(f"Long format 변환 중 오류: {e}")
             raise
     
-    def create_mappings(self, rating_long):
+    def create_real_id_mappings(self, rating_long):
         """
-        식당 이름-ID 매핑 딕셔너리 생성
-        
-        Args:
-            rating_long: Long format 데이터
-            
-        Returns:
-            pd.DataFrame: 매핑이 추가된 데이터
+        실제 ID 기준 매핑 생성 + 매칭 실패 시 0부터 시작하는 가상 ID 부여
         """
         try:
-            # 식당 이름 정규화 (공백 제거)
-            rating_long['restaurant_name'] = rating_long['restaurant_name'].str.strip()
+            logger.info("실제 ID 기준 매핑 생성 시작")
             
-            # 유니크한 식당 목록과 ID 매핑
-            unique_restaurants = rating_long['restaurant_name'].unique()
+            if self.restaurants_df is None:
+                raise ValueError("restaurants.csv를 먼저 로드해야 합니다")
             
-            # 매핑 딕셔너리 생성
-            self.restaurant_mapping = {name: idx for idx, name in enumerate(unique_restaurants)}
-            self.restaurant_reverse_mapping = {idx: name for name, idx in self.restaurant_mapping.items()}
+            # 설문에서 나온 유니크한 식당명들
+            unique_survey_restaurants = rating_long['restaurant_name'].unique()
+            logger.info(f"설문에서 추출된 식당 수: {len(unique_survey_restaurants)}개")
             
-            # 식당 ID 추가
-            rating_long['restaurant_id'] = rating_long['restaurant_name'].map(self.restaurant_mapping)
+            # 실제 ID 매핑 딕셔너리
+            survey_name_to_real_id = {}
+            real_id_to_survey_name = {}
             
-            logger.info(f"매핑 생성 완료: {len(unique_restaurants)}개 식당")
-            return rating_long
+            # 가상 ID 매핑 딕셔너리 (0부터 시작하는 양수)
+            survey_name_to_virtual_id = {}
+            virtual_id_to_survey_name = {}
+            
+            # 매칭 통계
+            exact_matches = 0
+            fuzzy_matches = 0
+            virtual_id_assigned = 0
+            
+            # 가상 ID 시작값 (0부터 시작)
+            virtual_id_counter = 0
+            
+            # 각 설문 식당명에 대해 실제 ID 찾기
+            for survey_name in unique_survey_restaurants:
+                real_id = self.find_matching_restaurant_id(survey_name)
+                
+                if real_id:
+                    # 실제 식당과 매칭된 경우 - 크롤링된 실제 ID 사용
+                    survey_name_to_real_id[survey_name] = real_id
+                    real_id_to_survey_name[real_id] = survey_name
+                    
+                    # 매칭 타입 확인
+                    normalized_survey = self.normalize_restaurant_name(survey_name)
+                    matched_restaurant = self.restaurants_df[self.restaurants_df['id'] == real_id].iloc[0]
+                    normalized_matched = self.normalize_restaurant_name(matched_restaurant['name'])
+                    
+                    if normalized_survey == normalized_matched:
+                        exact_matches += 1
+                    else:
+                        fuzzy_matches += 1
+                else:
+                    # 매칭 실패 시 0부터 시작하는 가상 ID 부여
+                    survey_name_to_virtual_id[survey_name] = virtual_id_counter
+                    virtual_id_to_survey_name[virtual_id_counter] = survey_name
+                    virtual_id_assigned += 1
+                    
+                    logger.info(f"가상 ID 부여: '{survey_name}' → ID: {virtual_id_counter}")
+                    virtual_id_counter += 1
+            
+            # 매칭 결과 통계
+            total_survey_restaurants = len(unique_survey_restaurants)
+            total_real_matched = len(survey_name_to_real_id)
+            total_processed = total_real_matched + virtual_id_assigned
+            
+            logger.info(f"매핑 결과 통계:")
+            logger.info(f"  전체 설문 식당: {total_survey_restaurants}개")
+            logger.info(f"  정확 매칭 (실제 ID): {exact_matches}개")
+            logger.info(f"  유사 매칭 (실제 ID): {fuzzy_matches}개")
+            logger.info(f"  가상 ID 부여 (0부터): {virtual_id_assigned}개")
+            logger.info(f"  전체 처리율: {(total_processed/total_survey_restaurants)*100:.1f}%")
+            
+            # 전체 매핑 딕셔너리 생성 (실제 ID + 가상 ID)
+            all_survey_to_id = {**survey_name_to_real_id, **survey_name_to_virtual_id}
+            all_id_to_survey = {**real_id_to_survey_name, **virtual_id_to_survey_name}
+            
+            # 모든 평점 데이터에 ID 매핑 (데이터 손실 없음)
+            rating_data_with_ids = rating_long.copy()
+            rating_data_with_ids['restaurant_id'] = rating_data_with_ids['restaurant_name'].map(all_survey_to_id)
+            
+            # 매핑 정보 저장 (실제 ID와 가상 ID 구분해서 저장)
+            self.restaurant_mapping = {
+                'real_id_mappings': {
+                    'survey_to_real_id': survey_name_to_real_id,
+                    'real_id_to_survey': real_id_to_survey_name
+                },
+                'virtual_id_mappings': {
+                    'survey_to_virtual_id': survey_name_to_virtual_id,
+                    'virtual_id_to_survey': virtual_id_to_survey_name
+                },
+                'all_mappings': {
+                    'survey_to_id': all_survey_to_id,
+                    'id_to_survey': all_id_to_survey
+                },
+                'statistics': {
+                    'total_restaurants': total_survey_restaurants,
+                    'real_matched': total_real_matched,
+                    'virtual_restaurants': virtual_id_assigned,
+                    'exact_matches': exact_matches,
+                    'fuzzy_matches': fuzzy_matches,
+                    'virtual_id_range': f"0 ~ {virtual_id_counter-1}" if virtual_id_counter > 0 else "없음"
+                }
+            }
+            
+            logger.info(f"ID 매핑 완료: {len(rating_data_with_ids)}개 평점 데이터 생성 (데이터 손실 없음)")
+            logger.info(f"실제 식당: {len(survey_name_to_real_id)}개, 가상 식당: {len(survey_name_to_virtual_id)}개 (ID: 0~{virtual_id_counter-1})")
+            
+            return rating_data_with_ids
             
         except Exception as e:
-            logger.error(f"매핑 생성 중 오류: {e}")
+            logger.error(f"ID 매핑 생성 중 오류: {e}")
             raise
-    
-    def prepare_svd_data(self, rating_long):
+
+    def prepare_svd_data(self, rating_data_with_real_ids):
         """
-        SVD++ 입력용 데이터 준비
-        
-        Args:
-            rating_long: 매핑이 완료된 Long format 데이터
-            
-        Returns:
-            pd.DataFrame: SVD++ 입력용 데이터
+        SVD++ 입력용 데이터 준비 (실제 ID 사용)
         """
         try:
             # 필요한 컬럼만 선택하고 컬럼명 변경
-            svd_data = rating_long[['user_id', 'restaurant_id', 'rating']].copy()
+            svd_data = rating_data_with_real_ids[['user_id', 'restaurant_id', 'rating']].copy()
             svd_data.columns = ['userId', 'restaurantId', 'rating']
             
             logger.info(f"SVD++ 데이터 준비 완료: {svd_data.shape}")
+            logger.info(f"사용자 수: {svd_data['userId'].nunique()}명")
+            logger.info(f"식당 수: {svd_data['restaurantId'].nunique()}개")
+            logger.info(f"평점 데이터: {len(svd_data)}개")
+            
             return svd_data
             
         except Exception as e:
@@ -183,12 +351,6 @@ class RestaurantDataPreprocessor:
     def create_surprise_dataset(self, svd_data):
         """
         Surprise 라이브러리용 데이터셋 생성
-        
-        Args:
-            svd_data: SVD++ 입력용 데이터
-            
-        Returns:
-            surprise.Dataset: Surprise 데이터셋
         """
         try:
             reader = Reader(rating_scale=self.rating_scale)
@@ -203,24 +365,18 @@ class RestaurantDataPreprocessor:
     
     def save_mappings(self, output_path):
         """
-        매핑 딕셔너리를 파일로 저장
-        
-        Args:
-            output_path: 저장할 파일 경로
+        실제 ID + 가상 ID 매핑 딕셔너리를 파일로 저장
         """
         try:
             if self.restaurant_mapping is None:
                 raise ValueError("매핑 딕셔너리가 생성되지 않았습니다.")
-                
-            mappings = {
-                'restaurant_to_id': self.restaurant_mapping,
-                'id_to_restaurant': self.restaurant_reverse_mapping
-            }
             
             with open(output_path, 'wb') as f:
-                pickle.dump(mappings, f)
+                pickle.dump(self.restaurant_mapping, f)
                 
-            logger.info(f"매핑 딕셔너리 저장 완료: {output_path}")
+            logger.info(f"전체 매핑 딕셔너리 저장 완료: {output_path}")
+            logger.info(f"  - 실제 ID 매핑: {len(self.restaurant_mapping['real_id_mappings']['survey_to_real_id'])}개")
+            logger.info(f"  - 가상 ID 매핑: {len(self.restaurant_mapping['virtual_id_mappings']['survey_to_virtual_id'])}개")
             
         except Exception as e:
             logger.error(f"매핑 저장 중 오류: {e}")
@@ -229,10 +385,6 @@ class RestaurantDataPreprocessor:
     def save_svd_data_csv(self, svd_data, output_path):
         """
         SVD 데이터를 CSV 파일로 저장
-        
-        Args:
-            svd_data: SVD 입력용 데이터프레임
-            output_path: 저장할 CSV 파일 경로
         """
         try:
             svd_data.to_csv(output_path, index=False)
@@ -245,10 +397,6 @@ class RestaurantDataPreprocessor:
     def save_surprise_dataset(self, surprise_dataset, output_path):
         """
         Surprise 데이터셋을 pickle 파일로 저장
-        
-        Args:
-            surprise_dataset: Surprise Dataset 객체
-            output_path: 저장할 pickle 파일 경로
         """
         try:
             with open(output_path, 'wb') as f:
@@ -259,446 +407,150 @@ class RestaurantDataPreprocessor:
             logger.error(f"Surprise 데이터셋 저장 중 오류: {e}")
             raise
     
-    def load_surprise_dataset(self, dataset_path):
-        """
-        저장된 Surprise 데이터셋을 불러오기
-        
-        Args:
-            dataset_path: 불러올 pickle 파일 경로
-            
-        Returns:
-            surprise.Dataset: Surprise 데이터셋 객체
-        """
-        try:
-            if not os.path.exists(dataset_path):
-                raise FileNotFoundError(f"데이터셋 파일을 찾을 수 없습니다: {dataset_path}")
-            
-            with open(dataset_path, 'rb') as f:
-                surprise_dataset = pickle.load(f)
-            
-            logger.info(f"Surprise 데이터셋 로드 완료: {dataset_path}")
-            return surprise_dataset
-            
-        except Exception as e:
-            logger.error(f"Surprise 데이터셋 로드 중 오류: {e}")
-            raise
-    
-    def load_svd_data_from_csv(self, csv_path):
-        """
-        CSV 파일에서 SVD 데이터를 불러와서 Surprise 데이터셋 생성
-        
-        Args:
-            csv_path: 불러올 CSV 파일 경로
-            
-        Returns:
-            tuple: (svd_data, surprise_dataset)
-        """
-        try:
-            if not os.path.exists(csv_path):
-                raise FileNotFoundError(f"CSV 파일을 찾을 수 없습니다: {csv_path}")
-            
-            # CSV에서 SVD 데이터 로드
-            svd_data = pd.read_csv(csv_path)
-            logger.info(f"CSV에서 SVD 데이터 로드 완료: {svd_data.shape}")
-            
-            # 데이터 컬럼 검증
-            required_columns = ['userId', 'restaurantId', 'rating']
-            if not all(col in svd_data.columns for col in required_columns):
-                raise ValueError(f"CSV 파일에 필수 컬럼이 없습니다. 필요한 컬럼: {required_columns}")
-            
-            # Surprise 데이터셋 생성
-            surprise_dataset = self.create_surprise_dataset(svd_data)
-            
-            logger.info("CSV에서 Surprise 데이터셋 생성 완료")
-            return svd_data, surprise_dataset
-            
-        except Exception as e:
-            logger.error(f"CSV 로드 중 오류: {e}")
-            raise
-    
     def get_data_summary(self, svd_data):
         """
-        데이터 요약 정보 반환
-        
-        Args:
-            svd_data: SVD++ 데이터
-            
-        Returns:
-            dict: 데이터 요약 정보
+        데이터 요약 정보 반환 (가상 ID는 0부터 시작)
         """
+        if self.restaurant_mapping is None:
+            return {
+                'total_ratings': len(svd_data),
+                'num_users': svd_data['userId'].nunique(),
+                'num_restaurants': svd_data['restaurantId'].nunique(),
+                'rating_distribution': svd_data['rating'].value_counts().to_dict(),
+                'sparsity': len(svd_data) / (svd_data['userId'].nunique() * svd_data['restaurantId'].nunique())
+            }
+        
+        # 매핑 통계에서 정보 가져오기
+        stats = self.restaurant_mapping['statistics']
+        
         summary = {
             'total_ratings': len(svd_data),
             'num_users': svd_data['userId'].nunique(),
             'num_restaurants': svd_data['restaurantId'].nunique(),
+            'real_restaurants': stats['real_matched'],
+            'virtual_restaurants': stats['virtual_restaurants'],
+            'exact_matches': stats['exact_matches'],
+            'fuzzy_matches': stats['fuzzy_matches'],
             'rating_distribution': svd_data['rating'].value_counts().to_dict(),
-            'sparsity': len(svd_data) / (svd_data['userId'].nunique() * svd_data['restaurantId'].nunique())
+            'sparsity': len(svd_data) / (svd_data['userId'].nunique() * svd_data['restaurantId'].nunique()),
+            'real_match_rate': (stats['real_matched'] / stats['total_restaurants']) * 100 if stats['total_restaurants'] > 0 else 0,
+            'virtual_id_range': stats['virtual_id_range']
         }
         return summary
     
-    def load_restaurant_json(self, file_path):
+    def improved_preprocessing_pipeline(self, rating_file_path, restaurants_csv_path,
+                                      mappings_output_path='restaurant_real_id_mappings.pkl', 
+                                      csv_output_path='svd_data.csv', 
+                                      surprise_output_path='surprise_dataset.pkl', 
+                                      save_csv=True, save_surprise=True):
         """
-        restaurants.json 파일을 로드
-        
-        Args:
-            file_path: JSON 파일 경로
-            
-        Returns:
-            list: 식당 데이터 리스트
+        개선된 전체 전처리 파이프라인 실행 (실제 ID 기준)
         """
         try:
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"파일을 찾을 수 없습니다: {file_path}")
-                
-            with open(file_path, 'r', encoding='utf-8') as f:
-                restaurant_data = json.load(f)
-                
-            logger.info(f"식당 JSON 데이터 로드 완료: {len(restaurant_data)}개 식당")
-            return restaurant_data
+            logger.info("🚀 개선된 전처리 파이프라인 시작 (실제 ID 기준)")
             
-        except Exception as e:
-            logger.error(f"JSON 데이터 로드 중 오류: {e}")
-            raise
-
-    def extract_restaurant_features(self, restaurant_data):
-        """
-        JSON 데이터에서 필요한 필드만 추출하여 데이터프레임 생성
-        누락된 필드는 None으로 처리하여 데이터 보존
-        
-        Args:
-            restaurant_data: 식당 JSON 데이터 리스트
+            # 1. 식당 데이터 로드 (restaurants.csv)
+            self.load_restaurants_data(restaurants_csv_path)
             
-        Returns:
-            pd.DataFrame: 식당 정보 데이터프레임
-        """
-        try:
-            restaurants = []
+            # 2. 원본 설문 데이터 로드
+            raw_data = self.load_raw_data(rating_file_path)
             
-            for restaurant in restaurant_data:
-                # 필요한 필드만 추출 (없으면 None)
-                extracted_data = {
-                    'id': restaurant.get('id'),
-                    'name': restaurant.get('name'),
-                    'category': restaurant.get('category'),
-                    'menu_average': restaurant.get('menu_average')
-                }
-                
-                # id나 name이 없는 경우만 스킵 (핵심 식별자)
-                if extracted_data['id'] is None or extracted_data['name'] is None:
-                    logger.warning(f"핵심 필드(id/name) 누락된 식당 스킵: {restaurant.get('name', 'Unknown')}")
-                    continue
-                    
-                restaurants.append(extracted_data)
-            
-            restaurant_df = pd.DataFrame(restaurants)
-            
-            # 데이터 타입 정리
-            if not restaurant_df.empty:
-                # menu_average는 숫자형으로 변환 (변환 불가능하면 NaN)
-                restaurant_df['menu_average'] = pd.to_numeric(restaurant_df['menu_average'], errors='coerce')
-            
-            logger.info(f"식당 데이터프레임 생성 완료: {len(restaurant_df)}개 식당")
-            
-            # 누락 데이터 현황 로그
-            missing_info = restaurant_df.isnull().sum()
-            if missing_info.any():
-                logger.info(f"누락 데이터 현황:\n{missing_info}")
-            
-            return restaurant_df
-        
-        except Exception as e:
-            logger.error(f"식당 데이터 추출 중 오류: {e}")
-            raise
-    
-    def prepare_content_features(self, restaurant_df):
-        """
-        콘텐츠 기반 필터링을 위한 특성 벡터 준비
-        NaN 값 처리 및 범주형 데이터 인코딩
-        
-        Args:
-            restaurant_df: 식당 데이터프레임
-            
-        Returns:
-            pd.DataFrame: 전처리된 특성 매트릭스
-        """
-        try:
-            df = restaurant_df.copy()
-            
-            # 1. menu_average 결측값 처리 (평균값으로 대체)
-            if df['menu_average'].isnull().any():
-                mean_price = df['menu_average'].mean()
-                df['menu_average'] = df['menu_average'].fillna(mean_price)
-                logger.info(f"menu_average 결측값을 평균값({mean_price:.0f})으로 대체")
-            
-            # 2. category 결측값 처리 (기타로 대체)
-            if df['category'].isnull().any():
-                df['category'] = df['category'].fillna('기타')
-                logger.info("category 결측값을 '기타'로 대체")
-            
-            # 3. category를 원-핫 인코딩
-            category_dummies = pd.get_dummies(df['category'], prefix='category')
-            
-            # 4. menu_average 정규화 (0-1 스케일)
-            df['menu_average_normalized'] = (df['menu_average'] - df['menu_average'].min()) / \
-                                        (df['menu_average'].max() - df['menu_average'].min())
-            
-            # 5. 최종 특성 매트릭스 구성
-            feature_matrix = pd.concat([
-                df[['id', 'name']],  # 식별자
-                category_dummies,    # 카테고리 원-핫 인코딩
-                df[['menu_average_normalized']]  # 정규화된 가격
-            ], axis=1)
-            
-            logger.info(f"콘텐츠 특성 매트릭스 생성 완료: {feature_matrix.shape}")
-            return feature_matrix
-            
-        except Exception as e:
-            logger.error(f"콘텐츠 특성 준비 중 오류: {e}")
-            raise
-
-    def save_restaurant_csv(self, restaurant_df, output_path):
-        """
-        식당 데이터프레임을 CSV 파일로 저장
-        
-        Args:
-            restaurant_df: 식당 데이터프레임
-            output_path: 저장할 CSV 파일 경로
-        """
-        try:
-            restaurant_df.to_csv(output_path, index=False, encoding='utf-8')
-            logger.info(f"식당 데이터 CSV 저장 완료: {output_path}")
-            
-        except Exception as e:
-            logger.error(f"식당 CSV 저장 중 오류: {e}")
-            raise
-
-    def process_restaurant_data(self, json_file_path, csv_output_path):
-        """
-        식당 JSON 데이터 전처리 파이프라인
-        JSON 파일에서 필요한 필드만 추출하여 CSV로 저장
-        
-        Args:
-            json_file_path: 입력 JSON 파일 경로
-            csv_output_path: 출력 CSV 파일 경로
-            save_content_features: 콘텐츠 특성 매트릭스 저장 여부
-            
-        Returns:
-            pd.DataFrame: 처리된 식당 데이터프레임
-        """
-        try:
-            logger.info("식당 데이터 전처리 파이프라인 시작")
-            
-            # 1. JSON 파일 로드
-            restaurant_data = self.load_restaurant_json(json_file_path)
-            
-            # 2. 필요한 필드 추출하여 데이터프레임 생성
-            restaurant_df = self.extract_restaurant_features(restaurant_data)
-            
-            # 3. CSV 파일로 저장
-            self.save_restaurant_csv(restaurant_df, csv_output_path)
-            
-            logger.info("식당 데이터 전처리 파이프라인 완료")
-            return restaurant_df
-            
-        except Exception as e:
-            logger.error(f"식당 데이터 전처리 중 오류: {e}")
-            raise
-    def save_content_features_csv(self, content_features_df, output_path):
-        """
-        콘텐츠 기반 필터링용 특성 매트릭스를 CSV 파일로 저장
-        
-        Args:
-            content_features_df: 콘텐츠 특성 매트릭스 데이터프레임
-            output_path: 저장할 CSV 파일 경로
-        """
-        try:
-            content_features_df.to_csv(output_path, index=False, encoding='utf-8')
-            logger.info(f"콘텐츠 특성 매트릭스 CSV 저장 완료: {output_path}")
-            
-        except Exception as e:
-            logger.error(f"콘텐츠 특성 CSV 저장 중 오류: {e}")
-            raise
-
-    def process_content_features_pipeline(self, restaurant_df, content_csv_output_path):
-        """
-        콘텐츠 기반 필터링용 특성 처리 파이프라인
-        특성 매트릭스 생성 후 CSV로 저장
-        
-        Args:
-            restaurant_df: 식당 데이터프레임
-            content_csv_output_path: 콘텐츠 특성 CSV 저장 경로
-            
-        Returns:
-            pd.DataFrame: 처리된 콘텐츠 특성 매트릭스
-        """
-        try:
-            logger.info("콘텐츠 특성 처리 파이프라인 시작")
-            
-            # 1. 콘텐츠 특성 매트릭스 생성
-            content_features = self.prepare_content_features(restaurant_df)
-            
-            # 2. CSV 파일로 저장
-            self.save_content_features_csv(content_features, content_csv_output_path)
-            
-            logger.info("콘텐츠 특성 처리 파이프라인 완료")
-            return content_features
-            
-        except Exception as e:
-            logger.error(f"콘텐츠 특성 처리 중 오류: {e}")
-            raise
-    
-    def preprocessing_pipeline(self, input_file_path, mappings_output_path='restaurant_mappings.pkl', 
-                          csv_output_path='svd_data.csv', surprise_output_path='surprise_dataset.pkl', 
-                          save_csv=True, save_surprise=True):
-        """
-        전체 전처리 파이프라인 실행
-        
-        Args:
-            input_file_path: 입력 엑셀 파일 경로
-            mappings_output_path: 매핑 딕셔너리 저장 경로
-            csv_output_path: SVD 데이터 CSV 저장 경로
-            surprise_output_path: Surprise 데이터셋 저장 경로
-            save_csv: CSV 파일로 저장 여부 (기본값: True)
-            save_surprise: Surprise 데이터셋 저장 여부 (기본값: True)
-        """
-        try:
-            logger.info("전처리 파이프라인 시작")
-            
-            # 1. 원본 데이터 로드
-            raw_data = self.load_raw_data(input_file_path)
-            
-            # 2. 컬럼 정리
+            # 3. 컬럼 정리
             cleaned_data = self.clean_columns(raw_data)
             
-            # 3. 식당-평점 데이터 분리
+            # 4. 식당-평점 데이터 분리
             restaurants, ratings = self.extract_restaurant_rating_data(cleaned_data)
             
-            # 4. Long format 변환
+            # 5. Long format 변환
             rating_long = self.convert_to_long_format(restaurants, ratings)
             
-            # 5. 매핑 생성
-            rating_long = self.create_mappings(rating_long)
+            # 6. 실제 ID 기준 매핑 생성 (핵심 개선!)
+            rating_data_with_real_ids = self.create_real_id_mappings(rating_long)
             
-            # 6. SVD++ 데이터 준비
-            svd_data = self.prepare_svd_data(rating_long)
+            # 7. SVD++ 데이터 준비
+            svd_data = self.prepare_svd_data(rating_data_with_real_ids)
             
-            # 7. Surprise 데이터셋 생성
+            # 8. Surprise 데이터셋 생성
             surprise_dataset = self.create_surprise_dataset(svd_data)
             
-            # 8. 매핑 저장
+            # 9. 실제 ID 매핑 저장
             self.save_mappings(mappings_output_path)
             
-            # 9. SVD 데이터 CSV 저장
+            # 10. SVD 데이터 CSV 저장
             if save_csv:
                 self.save_svd_data_csv(svd_data, csv_output_path)
             
-            # 10. Surprise 데이터셋 저장
+            # 11. Surprise 데이터셋 저장
             if save_surprise:
                 self.save_surprise_dataset(surprise_dataset, surprise_output_path)
             
-            # 11. 데이터 요약
+            # 12. 데이터 요약
             data_summary = self.get_data_summary(svd_data)
-            
-            logger.info("전처리 파이프라인 완료")
-            
+
+            logger.info("✅ 개선된 전처리 파이프라인 완료")
+            logger.info(f"📊 최종 결과:")
+            logger.info(f"  - 실제 식당: {data_summary['real_restaurants']}개")
+            logger.info(f"  - 가상 식당: {data_summary['virtual_restaurants']}개")
+            logger.info(f"  - 전체 식당: {data_summary['num_restaurants']}개")
+            logger.info(f"  - 사용자: {data_summary['num_users']}명")
+            logger.info(f"  - 평점 데이터: {data_summary['total_ratings']}개")
+            logger.info(f"  - 실제 식당 매칭률: {data_summary['real_match_rate']:.1f}%")
+            logger.info(f"  - 가상 ID 범위: {data_summary['virtual_id_range']}")
+            logger.info(f"  - 데이터 밀도: {data_summary['sparsity']:.4f}")
+
             return svd_data, surprise_dataset, data_summary
         
         except Exception as e:
-            logger.error(f"파이프라인 실행 중 오류: {e}")
+            logger.error(f"❌ 파이프라인 실행 중 오류: {e}")
             raise
+            
 
-# 사용 예시 수정
+# 사용 예시
 if __name__ == "__main__":
     import os
     
     # 현재 스크립트의 디렉토리 기준으로 상대 경로 설정
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(current_dir, '..', 'data')  # 상위 폴더의 data 폴더
-    result_dir = os.path.join(current_dir, '..', 'result')  # 상위 폴더의 result 폴더
+    data_dir = os.path.join(current_dir, '..', 'data')
+    result_dir = os.path.join(current_dir, '..', 'result')
     
     # 결과 폴더가 없으면 생성
     os.makedirs(result_dir, exist_ok=True)
     
-    # data path
-    rating_file_path=os.path.join(data_dir, 'rating.xlsx')
-    restaurant_json_path = os.path.join(data_dir, 'restaurants.json')
-    restaurant_csv_path = os.path.join(data_dir, 'restaurants.csv')
-    content_features_csv_path = os.path.join(data_dir, 'content_features.csv')
-    # result path 
-    mappings_output_path=os.path.join(result_dir, 'restaurant_mappings.pkl')
-    csv_output_path=os.path.join(result_dir, 'svd_data.csv')
-    surprise_output_path=os.path.join(result_dir, 'surprise_dataset.pkl')
+    # 파일 경로
+    rating_file_path = os.path.join(data_dir, 'rating.xlsx')
+    restaurants_csv_path = os.path.join(data_dir, 'restaurants.csv')
+    mappings_output_path = os.path.join(result_dir, 'restaurant_real_id_mappings.pkl')
+    csv_output_path = os.path.join(result_dir, 'svd_data.csv')
+    surprise_output_path = os.path.join(result_dir, 'surprise_dataset.pkl')
 
-    # 전처리기 초기화
-    preprocessor = RestaurantDataPreprocessor(rating_scale=(1, 5))
+    # 개선된 전처리기 초기화
+    preprocessor = ImprovedRestaurantDataPreprocessor(rating_scale=(1, 5))
     
     try:
-        # 1. 식당 데이터 전처리
-        print("=== 식당 데이터 전처리 시작 ===")
-        restaurant_df = preprocessor.process_restaurant_data(
-            restaurant_json_path,
-            restaurant_csv_path
-        )
-        print(f"식당 데이터 처리 완료: {len(restaurant_df)}개 식당")
-        print("처리된 식당 데이터 샘플:")
-        print(restaurant_df.head())
+        print("=== 전처리 파이프라인 실행 ===")
         
-        # 2. 콘텐츠 기반 필터링용 특성 처리 (추가)
-        print("\n=== 콘텐츠 특성 매트릭스 생성 시작 ===")
-        content_features = preprocessor.process_content_features_pipeline(
-            restaurant_df,
-            content_features_csv_path
-        )
-        print(f"콘텐츠 특성 매트릭스 생성 완료: {content_features.shape}")
-        print("특성 컬럼:", content_features.columns.tolist())
-        print("콘텐츠 특성 매트릭스 샘플:")
-        print(content_features.head())
-
-        # 3. 평점 데이터 전처리
-        print("\n=== 평점 데이터 전처리 시작 ===")
-        svd_data, surprise_dataset, summary = preprocessor.preprocessing_pipeline(
-            rating_file_path,
-            mappings_output_path,
-            csv_output_path,
-            surprise_output_path,
+        # 전체 파이프라인 실행
+        svd_data, surprise_dataset, summary = preprocessor.improved_preprocessing_pipeline(
+            rating_file_path=rating_file_path,
+            restaurants_csv_path=restaurants_csv_path,
+            mappings_output_path=mappings_output_path,
+            csv_output_path=csv_output_path,
+            surprise_output_path=surprise_output_path,
             save_csv=True,
             save_surprise=True
         )
         
-        print("평점 데이터 전처리 완료!")
-        print(f"데이터 요약: {summary}")
+        print("🎉 전처리 완료!")
+        print(f"📈 실제 식당 매칭률: {summary['real_match_rate']:.1f}%")
+        print(f"📊 실제 식당: {summary['real_restaurants']}개")
+        print(f"📊 가상 식당: {summary['virtual_restaurants']}개")
+        print(f"📊 가상 ID 범위: {summary['virtual_id_range']}")
+        print(f"📊 전체 데이터: {summary}")
+        
+        # 샘플 데이터 확인
+        print(f"\n🔍 생성된 SVD 데이터 샘플:")
+        print(svd_data.head())
         
     except Exception as e:
-        print(f"전처리 실패: {e}")
-
-#빠른 로드 (Surprise Dataset 직접 불러오기)
-    try:
-        print("Surprise 데이터셋 직접 로드 테스트...")
-        
-        # 새로운 전처리기 인스턴스 생성
-        new_preprocessor = RestaurantDataPreprocessor(rating_scale=(1, 5))
-        
-        # Surprise 데이터셋 직접 로드 (가장 빠름)
-        surprise_dataset = new_preprocessor.load_surprise_dataset(surprise_output_path)
-        
-        print("✅ Surprise 데이터셋 직접 로드 성공!")
-        print("⚡ 바로 SVD++ 학습 가능!")
-        
-    except Exception as e:
-        print(f"직접 로드 실패: {e}")
-    
-    print("\n" + "="*50 + "\n")
-    
-    # CSV 로드 (호환성용)
-    try:
-        print("CSV에서 데이터 불러오기 테스트...")
-        
-        # CSV에서 데이터 로드 (느리지만 호환성 좋음)
-        loaded_svd_data, loaded_surprise_dataset = new_preprocessor.load_svd_data_from_csv(csv_output_path)
-        
-        print("✅ CSV 로드 성공!")
-        print(f"로드된 데이터 형태: {loaded_svd_data.shape}")
-        print("첫 5개 데이터:")
-        print(loaded_svd_data.head())
-        
-    except Exception as e:
-        print(f"CSV 로드 실패: {e}")
+        print(f"❌ 전처리 실패: {e}")
