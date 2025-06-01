@@ -13,30 +13,45 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-@app.route('/recommendation/restaurants', methods=['POST'])
+@app.route('api/recommendation/restaurants', methods=['POST', 'GET'])
 def recommend_restaurants():
     """
     식당 추천 API 엔드포인트
     """
     try:
-        # 요청 데이터 파싱
-        data = request.get_json()
+        # GET 요청 처리
+        if request.method == 'GET':
+            user_id = request.args.get('userId')
+            user_category = request.args.getlist('userCategory')  # 쿼리 파라미터에서 리스트로 받기
+            remaining_budget = request.args.get('remainingBudget')
         
-        if not data:
-            return jsonify({'error': '요청 데이터가 없습니다'}), 400
-        
-        user_id = data.get('userId')
-        user_category = data.get('userCategory', [])
+        # POST 요청 처리 (기존 방식 유지)
+        else:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': '요청 데이터가 없습니다'}), 400
+            
+            user_id = data.get('userId')
+            user_category = data.get('userCategory', [])
+            remaining_budget = data.get('remainingBudget')
         
         if user_id is None:
             return jsonify({'error': 'userId가 필요합니다'}), 400
         
-        logger.info(f"추천 요청 - 사용자: {user_id}, 카테고리: {user_category}")
+        logger.info(f"추천 요청 - 사용자: {user_id}, 카테고리: {user_category}, 예산: {remaining_budget}")
         
-        # 추천 실행 (예산은 나중에 사용자 프로필에서 가져올 예정)
+        # 예산 처리 (문자열을 숫자로 변환)
+        budget = None
+        if remaining_budget:
+            try:
+                budget = int(remaining_budget)
+            except ValueError:
+                logger.warning(f"잘못된 예산 형식: {remaining_budget}")
+        
+        # 추천 실행
         recommendations = get_restaurant_recommendations(
             user_id=int(user_id),
-            budget=None,  # 현재는 예산 제한 없음
+            budget=budget,
             top_n=10
         )
         
