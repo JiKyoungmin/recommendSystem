@@ -27,25 +27,25 @@ def recommend_restaurants():
         # GET 요청 처리
         if request.method == 'GET':
             user_id = request.args.get('userId')
-            user_category = request.args.getlist('userCategory')  # 쿼리 파라미터에서 리스트로 받기
+            user_category = request.args.getlist('userCategory')  # 리스트로 받기
             remaining_budget = request.args.get('remainingBudget')
         
-        # POST 요청 처리 (기존 방식 유지)
+        # POST 요청 처리
         else:
             data = request.get_json()
             if not data:
                 return jsonify({'error': '요청 데이터가 없습니다'}), 400
             
             user_id = data.get('userId')
-            user_category = data.get('userCategory', [])
+            user_category = data.get('userCategory', [])  # 리스트로 받기
             remaining_budget = data.get('remainingBudget')
         
         if user_id is None:
             return jsonify({'error': 'userId가 필요합니다'}), 400
         
-        logger.info(f"추천 요청 - 사용자: {user_id}, 카테고리: {user_category}, 예산: {remaining_budget}")
+        logger.info(f"추천 요청 - 사용자: {user_id}, 선호 카테고리: {user_category}, 예산: {remaining_budget}")
         
-        # 예산 처리 (문자열을 숫자로 변환)
+        # 예산 처리 
         budget = None
         if remaining_budget:
             try:
@@ -56,17 +56,15 @@ def recommend_restaurants():
         # 추천 실행
         recommendations = get_restaurant_recommendations(
             user_id=int(user_id),
+            user_categories=user_category,  # 새로 추가
             budget=budget,
             top_n=10
         )
-        
-        # 응답 형식에 맞게 변환
+    
         restaurant_ids = [rec['restaurant_id'] for rec in recommendations['recommendations']]
-        
         response = {
             'restaurantUniqueIds': restaurant_ids
         }
-        
         logger.info(f"추천 완료 - {len(restaurant_ids)}개 식당")
         return jsonify(response)
         
