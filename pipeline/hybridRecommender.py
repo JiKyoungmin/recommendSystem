@@ -140,9 +140,9 @@ class HybridRecommendationSystem:
                 svd_scores_int[restaurant_id] = svd_scores[restaurant_id]
                 content_scores_dict[restaurant_id] = content_scores[restaurant_id]
 
-        # 6. 하이브리드 점수 계산
-        hybrid_scores = {}
-        budget_excluded = 0
+        # 6. 예산별 식당 분류 및 점수 계산 
+        budget_within = {}  # 예산 내 식당
+        budget_over = {}    # 예산 초과 식당
         category_boosted = 0
         
         for restaurant_id in svd_scores_int.keys():
@@ -158,62 +158,65 @@ class HybridRecommendationSystem:
                 if restaurant_category in user_categories:
                     hybrid_score = hybrid_score * (1 + category_boost)
                     category_boosted += 1
-                    logger.debug(f"카테고리 부스트 적용: 식당 {restaurant_id} ({restaurant_category}) - 점수: {hybrid_score:.2f}")
             
-            # 예산 필터링
-            budget_ok = True
+            # 예산별 분류
             if budget is not None and restaurant_id in self.restaurant_info:
                 menu_price = self.restaurant_info[restaurant_id]['menu_average']
-                if menu_price > budget:
-                    budget_ok = False
-                    budget_excluded += 1
-                    logger.debug(f"식당 {restaurant_id} 예산 초과: {menu_price} > {budget}")
-            
-            if budget_ok:
-                hybrid_scores[restaurant_id] = {
+                
+                if menu_price <= budget:
+                    # 예산 내 식당
+                    budget_within[restaurant_id] = {
+                        'hybrid_score': hybrid_score,
+                        'svd_score': svd_score,
+                        'content_score': content_score,
+                        'menu_price': menu_price,
+                        'budget_status': 'within'
+                    }
+                else:
+                    # 예산 초과 식당 - 페널티 적용
+                    budget_excess = menu_price - budget
+                    budget_ratio = menu_price / budget
+                    
+                    # 페널티 계산 (초과 정도에 따라 차등)
+                    if budget_ratio <= 1.2:  # 20% 이하 초과
+                        penalty = 0.1
+                    elif budget_ratio <= 1.5:  # 50% 이하 초과
+                        penalty = 0.3
+                    else:  # 50% 초과
+                        penalty = 0.5
+                    
+                    penalized_score = hybrid_score * (1 - penalty)
+                    
+                    budget_over[restaurant_id] = {
+                        'hybrid_score': penalized_score,
+                        'original_score': hybrid_score,
+                        'svd_score': svd_score,
+                        'content_score': content_score,
+                        'menu_price': menu_price,
+                        'budget_status': 'over',
+                        'budget_excess': budget_excess,
+                        'penalty_applied': penalty
+                    }
+            else:
+                # 예산 제한 없음 또는 가격 정보 없음
+                budget_within[restaurant_id] = {
                     'hybrid_score': hybrid_score,
                     'svd_score': svd_score,
-                    'content_score': content_score
+                    'content_score': content_score,
+                    'menu_price': self.restaurant_info.get(restaurant_id, {}).get('menu_average', 0),
+                    'budget_status': 'no_limit'
                 }
-
-        # 로깅 정보
-        if user_categories:
-            logger.info(f"선호 카테고리 부스트 적용: {category_boosted}개 식당")
         
-        if budget is not None:
-            logger.info(f"예산 필터링으로 제외된 식당: {budget_excluded}개")
+        # 7. 우선순위 기반 추천 목록 생성
+        final_recommendations = self._create_priority_based_recommendations(
+            budget_within, budget_over, top_n
+        )
         
-        logger.info(f"최종 후보 식당 수: {len(hybrid_scores)}개")
-
-        # 7. 추천 가능한 식당이 없는 경우
-        if len(hybrid_scores) == 0:
-            logger.warning("예산/카테고리 조건을 만족하는 식당이 없습니다")
-            return self._fallback_recommendation(user_id, budget, top_n)
-
-        # 8. 상위 N개 식당 선택
-        sorted_restaurants = sorted(
-            hybrid_scores.items(),
-            key=lambda x: x[1]['hybrid_score'],
-            reverse=True
-        )[:top_n]
-
-        # 9. 추천 결과 생성
-        recommendations = []
-        for rest_id, scores in sorted_restaurants:
-            restaurant_info = self.restaurant_info.get(rest_id, {})
-            
-            recommendations.append({
-                'restaurant_id': rest_id,
-                'restaurant_name': restaurant_info.get('name', 'Unknown'),
-                'category': restaurant_info.get('category', 'Unknown'),
-                'menu_average': restaurant_info.get('menu_average', 0),
-                'hybrid_score': round(scores['hybrid_score'], 2),
-                'svd_score': round(scores['svd_score'], 2),
-                'content_score': round(scores['content_score'], 2)
-            })
-
-        logger.info(f"하이브리드 추천 완료: {len(recommendations)}개 식당")
-        return recommendations
+        # 로깅
+        logger.info(f"예산 내 식당: {len(budget_within)}개, 예산 초과 식당: {len(budget_over)}개")
+        logger.info(f"최종 추천: {len(final_recommendations)}개")
+        
+        return final_recommendations
         
     def _fallback_recommendation(self, user_id, budget, top_n):
         """
@@ -222,46 +225,124 @@ class HybridRecommendationSystem:
         logger.info("대안책: SVD++만으로 추천 진행")
         
         svd_scores = self.svd_matrix.loc[user_id]
-        fallback_scores = {}
+        budget_within = {}
+        budget_over = {}
         
         for restaurant_id, score in svd_scores.items():
             rest_id = int(restaurant_id) if str(restaurant_id).isdigit() else restaurant_id
             
-            # 예산 필터링
+            # 예산별 분류
             if budget is not None and rest_id in self.restaurant_info:
                 menu_price = self.restaurant_info[rest_id]['menu_average']
-                if menu_price > budget:
-                    continue
-            
-            fallback_scores[rest_id] = {
-                'hybrid_score': score,
-                'svd_score': score,
-                'content_score': 0.0  # 콘텐츠 점수 없음
-            }
+                if menu_price <= budget:
+                    budget_within[rest_id] = {
+                        'hybrid_score': score,
+                        'svd_score': score,
+                        'content_score': 0.0,
+                        'menu_price': menu_price,
+                        'budget_status': 'within'
+                    }
+                else:
+                    # 예산 초과 식당 페널티 적용
+                    budget_ratio = menu_price / budget
+                    penalty = 0.1 if budget_ratio <= 1.2 else (0.3 if budget_ratio <= 1.5 else 0.5)
+                    penalized_score = score * (1 - penalty)
+                    
+                    budget_over[rest_id] = {
+                        'hybrid_score': penalized_score,
+                        'original_score': score,
+                        'svd_score': score,
+                        'content_score': 0.0,
+                        'menu_price': menu_price,
+                        'budget_status': 'over',
+                        'budget_excess': menu_price - budget,
+                        'penalty_applied': penalty
+                    }
+            else:
+                budget_within[rest_id] = {
+                    'hybrid_score': score,
+                    'svd_score': score,
+                    'content_score': 0.0,
+                    'menu_price': self.restaurant_info.get(rest_id, {}).get('menu_average', 0),
+                    'budget_status': 'no_limit'
+                }
         
-        # 상위 N개 선택
-        sorted_restaurants = sorted(
-            fallback_scores.items(),
+        # 우선순위 기반 추천 생성
+        recommendations = self._create_priority_based_recommendations(
+            budget_within, budget_over, top_n
+        )
+        
+        logger.warning(f"대안책으로 {len(recommendations)}개 식당 추천")
+        return recommendations
+
+    def _create_priority_based_recommendations(self, budget_within, budget_over, top_n):
+        """
+        예산 내 식당을 우선하되, 부족할 경우 예산 초과 식당도 포함
+        
+        Args:
+            budget_within: 예산 내 식당 딕셔너리
+            budget_over: 예산 초과 식당 딕셔너리
+            top_n: 목표 추천 개수
+        
+        Returns:
+            list: 우선순위 기반 추천 목록
+        """
+        recommendations = []
+        
+        # 1단계: 예산 내 식당 우선 추천
+        within_sorted = sorted(
+            budget_within.items(),
             key=lambda x: x[1]['hybrid_score'],
             reverse=True
-        )[:top_n]
+        )
         
-        recommendations = []
-        for rest_id, scores in sorted_restaurants:
+        # 예산 내 식당으로 추천 목록 채우기
+        for rest_id, scores in within_sorted[:top_n]:
             restaurant_info = self.restaurant_info.get(rest_id, {})
             
             recommendations.append({
                 'restaurant_id': rest_id,
                 'restaurant_name': restaurant_info.get('name', 'Unknown'),
                 'category': restaurant_info.get('category', 'Unknown'),
-                'menu_average': restaurant_info.get('menu_average', 0),
+                'menu_average': scores['menu_price'],
                 'hybrid_score': round(scores['hybrid_score'], 2),
                 'svd_score': round(scores['svd_score'], 2),
-                'content_score': 0.0
+                'content_score': round(scores['content_score'], 2),
+                'budget_status': scores['budget_status']
             })
         
-        logger.warning(f"대안책으로 {len(recommendations)}개 식당 추천")
+        # 2단계: 부족하면 예산 초과 식당 추가
+        if len(recommendations) < top_n and budget_over:
+            remaining_slots = top_n - len(recommendations)
+            
+            # 예산 초과 식당을 페널티 적용된 점수로 정렬
+            over_sorted = sorted(
+                budget_over.items(),
+                key=lambda x: x[1]['hybrid_score'],  # 이미 페널티 적용된 점수
+                reverse=True
+            )
+            
+            for rest_id, scores in over_sorted[:remaining_slots]:
+                restaurant_info = self.restaurant_info.get(rest_id, {})
+                
+                recommendations.append({
+                    'restaurant_id': rest_id,
+                    'restaurant_name': restaurant_info.get('name', 'Unknown'),
+                    'category': restaurant_info.get('category', 'Unknown'),
+                    'menu_average': scores['menu_price'],
+                    'hybrid_score': round(scores['hybrid_score'], 2),
+                    'original_score': round(scores['original_score'], 2),
+                    'svd_score': round(scores['svd_score'], 2),
+                    'content_score': round(scores['content_score'], 2),
+                    'budget_status': scores['budget_status'],
+                    'budget_excess': scores['budget_excess'],
+                    'penalty_applied': scores['penalty_applied']
+                })
+            
+            logger.info(f"예산 부족으로 초과 식당 {remaining_slots}개 추가 (페널티 적용)")
+        
         return recommendations
+
     def get_recommendations_json(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7):
         """
         API 응답용 JSON 형태로 추천 결과 반환
