@@ -15,25 +15,31 @@ class HybridRecommendationSystem:
     def __init__(self, svd_matrix_path, restaurants_path, content_features_path, mappings_path):
         """
         초기화: SVD++ 결과와 콘텐츠 기반 추천기 로드
-        
-        Args:
-            svd_matrix_path: SVD++ 예측 매트릭스 경로
-            restaurants_path: restaurants.csv 경로
-            content_features_path: content_features.csv 경로
-            mappings_path: 매핑 파일 경로
         """
+        # 매핑 정보 먼저 로드
+        with open(mappings_path, 'rb') as f:
+            mappings = pickle.load(f)
+        
+        # 매핑 딕셔너리 설정
+        if 'all_mappings' in mappings:
+            self.survey_to_id = mappings['all_mappings']['survey_to_id']
+            self.id_to_survey = mappings['all_mappings']['id_to_survey']
+        else:
+            self.survey_to_id = mappings['restaurant_to_id']
+            self.id_to_survey = mappings['id_to_restaurant']
+        
+        logger.info(f"매핑 정보 로드: {len(self.survey_to_id)}개")
+        
         # SVD++ 예측 매트릭스 로드
         self.svd_matrix = pd.read_csv(svd_matrix_path, index_col=0)
         
-        # === SVD 매트릭스 컬럼을 정수로 변환 ===
+        # SVD 매트릭스 컬럼을 정수로 변환
         try:
-            # 모든 컬럼을 정수로 변환 시도
             int_columns = []
             for col in self.svd_matrix.columns:
                 try:
                     int_columns.append(int(col))
                 except ValueError:
-                    # 변환 불가능한 컬럼은 원본 유지
                     int_columns.append(col)
             
             self.svd_matrix.columns = int_columns
@@ -42,20 +48,22 @@ class HybridRecommendationSystem:
         except Exception as e:
             logger.warning(f"SVD 매트릭스 컬럼 변환 실패: {e}")
 
+        # 식당 정보 로드
+        self.restaurants = pd.read_csv(restaurants_path)
+        
+        # 매핑 정보를 활용한 통합 식당 정보 딕셔너리 생성
+        self._create_restaurant_info_dict()
+        
         # 콘텐츠 기반 추천기 초기화
         self.content_recommender = ContentBasedRecommender(
             restaurants_path, content_features_path, mappings_path
         )
         
-        # 식당 정보 로드
-        self.restaurants = pd.read_csv(restaurants_path)
-        self.restaurant_info = self.restaurants.set_index('id').to_dict('index')
-        
-        # 콘텐츠 기반 매트릭스 생성
+        # 콘텐츠 기반 매트릭스 초기화
         self.content_matrix = None
         
         logger.info("하이브리드 추천 시스템 초기화 완료")
-    
+        
     def prepare_content_matrix(self, svd_data_path):
         """
         콘텐츠 기반 예측 매트릭스 생성
@@ -75,6 +83,85 @@ class HybridRecommendationSystem:
         self.content_matrix = self.content_recommender.generate_user_restaurant_matrix(svd_data)
         
         logger.info("콘텐츠 기반 매트릭스 준비 완료")
+
+    def _create_restaurant_info_dict(self):
+        """
+        실제 ID + 가상 ID 통합 식당 정보 딕셔너리 생성
+        매핑 정보를 활용해 가상 ID에도 식당 정보 제공
+        """
+        self.restaurant_info_dict = {}
+        
+        # 1단계: restaurants.csv의 실제 식당 정보 로드
+        for _, restaurant in self.restaurants.iterrows():
+            self.restaurant_info_dict[restaurant['id']] = {
+                'name': restaurant['name'],
+                'category': restaurant['category'],
+                'menu_average': restaurant['menu_average']
+            }
+        
+        logger.info(f"실제 식당 정보 로드: {len(self.restaurant_info_dict)}개")
+        
+        # 2단계: 매핑 정보를 활용해 가상 ID 정보 생성
+        virtual_count = 0
+        
+        if 'all_mappings' in dir(self) or hasattr(self, 'survey_to_id'):
+            # survey_to_id에서 가상 ID들 찾기
+            for survey_name, mapped_id in self.survey_to_id.items():
+                # 가상 ID (0~1000 범위의 작은 숫자) 처리
+                if mapped_id < 1000 and mapped_id not in self.restaurant_info_dict:
+                    # 매핑된 실제 ID가 있는지 확인
+                    real_restaurant_info = None
+                    
+                    # 같은 설문명으로 실제 ID에 매핑된 식당이 있는지 찾기
+                    for other_survey, other_id in self.survey_to_id.items():
+                        if (other_survey == survey_name and 
+                            other_id > 1000 and 
+                            other_id in self.restaurant_info_dict):
+                            real_restaurant_info = self.restaurant_info_dict[other_id]
+                            break
+                    
+                    # 실제 식당 정보가 있으면 사용, 없으면 기본값 생성
+                    if real_restaurant_info:
+                        self.restaurant_info_dict[mapped_id] = real_restaurant_info.copy()
+                    else:
+                        # 설문명에서 카테고리 추정
+                        estimated_category = self._estimate_category_from_name(survey_name)
+                        
+                        self.restaurant_info_dict[mapped_id] = {
+                            'name': survey_name,
+                            'category': estimated_category,
+                            'menu_average': 20000  # 기본 평균 가격
+                        }
+                    
+                    virtual_count += 1
+                    logger.debug(f"가상 ID {mapped_id}: {survey_name}")
+        
+        logger.info(f"가상 식당 정보 생성: {virtual_count}개")
+        logger.info(f"통합 식당 정보 딕셔너리 완성: {len(self.restaurant_info_dict)}개")
+        
+        # 샘플 출력 (디버깅용)
+        sample_ids = list(self.restaurant_info_dict.keys())[:5]
+        logger.info(f"식당 정보 샘플: {[(id, self.restaurant_info_dict[id]['name']) for id in sample_ids]}")
+
+    def _estimate_category_from_name(self, restaurant_name):
+        """
+        식당명에서 카테고리 추정
+        """
+        name_lower = restaurant_name.lower()
+        
+        # 간단한 키워드 기반 카테고리 추정
+        if any(keyword in name_lower for keyword in ['피자', 'pizza', '버거', 'burger', '스테이크', '파스타']):
+            return '양식'
+        elif any(keyword in name_lower for keyword in ['라멘', '우동', '돈까스', '카츠', '초밥', '일식']):
+            return '일식'
+        elif any(keyword in name_lower for keyword in ['짜장', '짬뽕', '탕수육', '중식']):
+            return '중식'
+        elif any(keyword in name_lower for keyword in ['떡볶이', '김밥', '분식']):
+            return '분식'
+        elif any(keyword in name_lower for keyword in ['쌀국수', '팟타이', '아시안']):
+            return '아시안'
+        else:
+            return '한식'  # 기본값
 
     def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.2):
         """
@@ -470,10 +557,9 @@ def get_restaurant_recommendations(user_id, user_categories=None, budget=None, t
             'error': str(e),
             'error_detail': error_detail
         }
-        
+
 # 사용 예시
 # 메인 실행 부분도 안전하게 수정
-
 if __name__ == "__main__":
     # 테스트 실행
     test_user_id = 0
