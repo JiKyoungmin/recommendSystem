@@ -82,7 +82,7 @@ class HybridRecommendationSystem:
         
         Args:
             user_id: 사용자 ID
-            user_categories: 사용자 선호 카테고리 리스트 (새로 추가)
+            user_categories: 사용자 선호 카테고리 리스트
             budget: 예산 제한 (None이면 제한 없음)
             top_n: 추천할 식당 수
             alpha: SVD++ 가중치 (0.7이면 SVD++ 70%, 콘텐츠 30%)
@@ -93,21 +93,66 @@ class HybridRecommendationSystem:
         """
         logger.info(f"사용자 {user_id}에 대한 하이브리드 추천 시작 (선호 카테고리: {user_categories})")
 
-        # ... 기존 코드 (사용자 존재 확인, 공통 식당 찾기 등) ...
+        # 1. 사용자 존재 확인
+        if user_id not in self.svd_matrix.index:
+            logger.warning(f"사용자 {user_id}가 SVD 매트릭스에 없습니다")
+            return []
+        
+        if self.content_matrix is None:
+            logger.warning("콘텐츠 매트릭스가 준비되지 않았습니다")
+            return self._fallback_recommendation(user_id, budget, top_n)
+        
+        if user_id not in self.content_matrix.index:
+            logger.warning(f"사용자 {user_id}가 콘텐츠 매트릭스에 없습니다")
+            return self._fallback_recommendation(user_id, budget, top_n)
 
-        # 하이브리드 점수 계산 (수정된 부분)
+        # 2. SVD++ 점수 추출
+        svd_scores = self.svd_matrix.loc[user_id]
+        logger.info(f"SVD 점수 추출 완료: {len(svd_scores)}개 식당")
+
+        # 3. 콘텐츠 기반 점수 추출
+        content_scores = self.content_matrix.loc[user_id]
+        logger.info(f"콘텐츠 점수 추출 완료: {len(content_scores)}개 식당")
+
+        # 4. 공통 식당 찾기 (두 매트릭스에 모두 존재하는 식당들)
+        svd_restaurants = set(svd_scores.index)
+        content_restaurants = set(content_scores.index)
+        valid_restaurants = svd_restaurants.intersection(content_restaurants)
+        
+        logger.info(f"공통 식당 수: {len(valid_restaurants)}개")
+        
+        if len(valid_restaurants) == 0:
+            logger.warning("공통 식당이 없습니다. SVD++만으로 추천합니다")
+            return self._fallback_recommendation(user_id, budget, top_n)
+
+        # 5. 식당 ID를 정수로 변환하여 딕셔너리 생성
+        svd_scores_int = {}
+        content_scores_dict = {}
+        
+        for restaurant_id in valid_restaurants:
+            try:
+                # 정수 변환 시도
+                rest_id_int = int(restaurant_id) if str(restaurant_id).isdigit() else restaurant_id
+                svd_scores_int[rest_id_int] = svd_scores[restaurant_id]
+                content_scores_dict[rest_id_int] = content_scores[restaurant_id]
+            except (ValueError, TypeError):
+                # 변환 실패시 원본 사용
+                svd_scores_int[restaurant_id] = svd_scores[restaurant_id]
+                content_scores_dict[restaurant_id] = content_scores[restaurant_id]
+
+        # 6. 하이브리드 점수 계산
         hybrid_scores = {}
         budget_excluded = 0
         category_boosted = 0
         
-        for restaurant_id in valid_restaurants:
+        for restaurant_id in svd_scores_int.keys():
             svd_score = svd_scores_int[restaurant_id]
-            content_score = content_scores[restaurant_id]
+            content_score = content_scores_dict[restaurant_id]
             
             # 기본 하이브리드 점수 계산
             hybrid_score = alpha * svd_score + (1 - alpha) * content_score
             
-            # 카테고리 가중치 적용 (새로 추가된 로직)
+            # 카테고리 가중치 적용
             if user_categories and restaurant_id in self.restaurant_info:
                 restaurant_category = self.restaurant_info[restaurant_id]['category']
                 if restaurant_category in user_categories:
@@ -115,9 +160,9 @@ class HybridRecommendationSystem:
                     category_boosted += 1
                     logger.debug(f"카테고리 부스트 적용: 식당 {restaurant_id} ({restaurant_category}) - 점수: {hybrid_score:.2f}")
             
-            # 예산 필터링 (기존 로직)
+            # 예산 필터링
             budget_ok = True
-            if budget is not None:
+            if budget is not None and restaurant_id in self.restaurant_info:
                 menu_price = self.restaurant_info[restaurant_id]['menu_average']
                 if menu_price > budget:
                     budget_ok = False
@@ -130,11 +175,45 @@ class HybridRecommendationSystem:
                     'svd_score': svd_score,
                     'content_score': content_score
                 }
-        
-        # 로깅 정보 추가
+
+        # 로깅 정보
         if user_categories:
             logger.info(f"선호 카테고리 부스트 적용: {category_boosted}개 식당")
+        
+        if budget is not None:
+            logger.info(f"예산 필터링으로 제외된 식당: {budget_excluded}개")
+        
+        logger.info(f"최종 후보 식당 수: {len(hybrid_scores)}개")
 
+        # 7. 추천 가능한 식당이 없는 경우
+        if len(hybrid_scores) == 0:
+            logger.warning("예산/카테고리 조건을 만족하는 식당이 없습니다")
+            return self._fallback_recommendation(user_id, budget, top_n)
+
+        # 8. 상위 N개 식당 선택
+        sorted_restaurants = sorted(
+            hybrid_scores.items(),
+            key=lambda x: x[1]['hybrid_score'],
+            reverse=True
+        )[:top_n]
+
+        # 9. 추천 결과 생성
+        recommendations = []
+        for rest_id, scores in sorted_restaurants:
+            restaurant_info = self.restaurant_info.get(rest_id, {})
+            
+            recommendations.append({
+                'restaurant_id': rest_id,
+                'restaurant_name': restaurant_info.get('name', 'Unknown'),
+                'category': restaurant_info.get('category', 'Unknown'),
+                'menu_average': restaurant_info.get('menu_average', 0),
+                'hybrid_score': round(scores['hybrid_score'], 2),
+                'svd_score': round(scores['svd_score'], 2),
+                'content_score': round(scores['content_score'], 2)
+            })
+
+        logger.info(f"하이브리드 추천 완료: {len(recommendations)}개 식당")
+        return recommendations
         
     def _fallback_recommendation(self, user_id, budget, top_n):
         """
