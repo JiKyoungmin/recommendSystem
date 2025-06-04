@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+weight_manager = AdaptiveWeightManager()
+
 @app.route('/recommendation/restaurants', methods=['GET', 'POST'])
 def recommend_restaurants():
     """
-    식당 추천 API 엔드포인트
+    식당 추천 API 엔드포인트 (피드백 처리 포함)
     """
     try:
         # GET 요청 처리
@@ -30,6 +32,7 @@ def recommend_restaurants():
             user_id = request.args.get('userId')
             user_category = request.args.getlist('userCategory')
             remaining_budget = request.args.get('remainingBudget')
+            feedback = request.args.get('feedback')
         
         # POST 요청 처리
         else:
@@ -40,10 +43,29 @@ def recommend_restaurants():
             user_id = data.get('userId')
             user_category = data.get('userCategory', [])
             remaining_budget = data.get('remainingBudget')
+            feedback = data.get('feedback')
         
         if user_id is None:
             return jsonify({'error': 'userId가 필요합니다', 'restaurantUniqueIds': []}), 400
         
+        # 1단계: 피드백 처리 (추천보다 먼저 처리)
+        if feedback is not None:
+            if feedback in [1, 3, 5, 7]:
+                try:
+                    updated_weights = weight_manager.update_weights_from_feedback(
+                        user_id=int(user_id),
+                        feedback_score=feedback,
+                        recommendation_method='hybrid'
+                    )
+                    logger.info(f"피드백 반영 완료 - 사용자: {user_id}, 점수: {feedback}")
+                    logger.info(f"업데이트된 가중치: α={updated_weights['alpha']:.3f}, boost={updated_weights['category_boost']:.3f}")
+                except Exception as e:
+                    logger.error(f"피드백 처리 중 오류: {e}")
+                    # 피드백 처리 실패해도 추천은 계속 진행
+            else:
+                logger.warning(f"잘못된 피드백 값: {feedback} (1,3,5,7만 허용)")
+        
+        # 2단계: 추천 수행
         logger.info(f"추천 요청 - 사용자: {user_id}, 선호 카테고리: {user_category}, 예산: {remaining_budget}")
         
         # 예산 처리 
@@ -54,7 +76,7 @@ def recommend_restaurants():
             except ValueError:
                 logger.warning(f"잘못된 예산 형식: {remaining_budget}")
         
-        # 추천 실행
+        # 추천 실행 (업데이트된 가중치가 자동으로 반영됨)
         recommendations = get_restaurant_recommendations(
             user_id=int(user_id),
             user_categories=user_category,
@@ -67,14 +89,13 @@ def recommend_restaurants():
         if recommendations and 'recommendations' in recommendations:
             for rec in recommendations['recommendations']:
                 if 'restaurant_id' in rec:
-                    # 정수형으로 변환 보장
                     try:
                         rest_id = int(rec['restaurant_id'])
                         restaurant_ids.append(rest_id)
                     except (ValueError, TypeError):
                         logger.warning(f"잘못된 restaurant_id 형식: {rec['restaurant_id']}")
         
-        # 디버깅 로그 추가
+        # 디버깅 로그
         logger.info(f"추천 결과 상세:")
         logger.info(f"  전체 응답: {recommendations}")
         logger.info(f"  추출된 ID 수: {len(restaurant_ids)}")
@@ -186,43 +207,6 @@ def get_scheduler_info():
     except Exception as e:
         logger.error(f"스케줄러 정보 조회 중 오류: {str(e)}")
         return jsonify({'error': '서버 내부 오류'}), 500
-
-    # 전역 가중치 관리자
-    weight_manager = AdaptiveWeightManager()
-
-    @app.route('/feedback', methods=['POST'])
-    def process_feedback():
-        """
-        사용자 피드백 처리 및 가중치 업데이트
-        """
-        try:
-            data = request.get_json()
-            if not data:
-                return jsonify({'error': '피드백 데이터가 없습니다'}), 400
-            
-            user_id = data.get('userId')
-            feedback_score = data.get('feedback')
-            
-            if not user_id or feedback_score is None:
-                return jsonify({'error': 'userId와 feedback이 필요합니다'}), 400
-            
-            # 가중치 업데이트
-            updated_weights = weight_manager.update_weights_from_feedback(
-                user_id=user_id,
-                feedback_score=feedback_score,
-                recommendation_method='hybrid'
-            )
-            
-            logger.info(f"피드백 처리 완료 - 사용자: {user_id}, 점수: {feedback_score}")
-            
-            return jsonify({
-                'status': 'success',
-                'updated_weights': updated_weights
-            })
-            
-        except Exception as e:
-            logger.error(f"피드백 처리 중 오류: {str(e)}")
-            return jsonify({'error': '서버 내부 오류'}), 500
 
 # 서버 종료 시 스케줄러도 정리
 import atexit

@@ -63,14 +63,15 @@ class AdaptiveWeightManager:
         
         Args:
             user_id: 사용자 ID
-            feedback_score: 피드백 점수 (1-5)
+            feedback_score: 피드백 점수 (1, 3, 5, 7)
             recommendation_method: 사용된 추천 방법 ('svd', 'content', 'hybrid')
         """
         user_id_str = str(user_id)
         current_weights = self.get_user_weights(user_id)
         
         # 피드백 점수 정규화 (-1 ~ +1)
-        normalized_feedback = (feedback_score - 3) / 2  # 3점 기준, 5점=+1, 1점=-1
+        # 1=매우나쁨(-1), 3=나쁨(-0.33), 5=좋음(+0.33), 7=매우좋음(+1)
+        normalized_feedback = (feedback_score - 4) / 3  
         
         # 현재 알파값
         current_alpha = current_weights['alpha']
@@ -78,13 +79,13 @@ class AdaptiveWeightManager:
         
         # 가중치 조정 로직
         if recommendation_method == 'hybrid':
-            # 피드백이 좋으면(4-5점) 현재 비율 유지/강화
-            # 피드백이 나쁘면(1-2점) 비율 조정
+            # 피드백이 좋으면(5-7점) 현재 비율 유지/강화
+            # 피드백이 나쁘면(1-3점) 비율 조정
             
-            if feedback_score >= 4:
+            if feedback_score >= 5:
                 # 좋은 피드백: 현재 가중치를 약간 강화
                 alpha_adjustment = 0
-            elif feedback_score <= 2:
+            elif feedback_score <= 3:
                 # 나쁜 피드백: 가중치 균형 조정
                 # SVD++가 너무 높으면 줄이고, 너무 낮으면 올림
                 if current_alpha > 0.8:
@@ -94,16 +95,16 @@ class AdaptiveWeightManager:
                 else:
                     alpha_adjustment = np.random.choice([-self.learning_rate, self.learning_rate])
             else:
-                # 보통 피드백(3점): 작은 무작위 조정
-                alpha_adjustment = np.random.normal(0, self.learning_rate/2)
+                # 중간 피드백은 없음 (1,3,5,7만 사용)
+                alpha_adjustment = 0
             
             # 새로운 알파값 계산 (0.3 ~ 0.9 범위 제한)
             new_alpha = np.clip(current_alpha + alpha_adjustment, 0.3, 0.9)
             
             # 카테고리 부스트도 유사하게 조정
-            if feedback_score >= 4:
+            if feedback_score >= 5:
                 category_adjustment = self.learning_rate * 0.5  # 좋으면 카테고리 가중치 증가
-            elif feedback_score <= 2:
+            elif feedback_score <= 3:
                 category_adjustment = -self.learning_rate * 0.5  # 나쁘면 감소
             else:
                 category_adjustment = 0
