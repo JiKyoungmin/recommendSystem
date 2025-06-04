@@ -154,16 +154,22 @@ def get_update_status():
         logger.error(f"상태 확인 중 오류: {str(e)}")
         return jsonify({'error': '서버 내부 오류'}), 500
 
-@app.before_first_request
-def initialize_scheduler():
+def create_app():
     """
-    서버 시작 시 자동 스케줄러 초기화
+    Flask 애플리케이션 생성 및 초기화
     """
+    app = Flask(__name__)
+    
+    # 라우트 등록은 기존과 동일...
+    
+    # 스케줄러 초기화
     try:
         start_auto_scheduler()
         logger.info("✅ 자동 업데이트 스케줄러 시작됨")
     except Exception as e:
         logger.error(f"❌ 스케줄러 시작 실패: {str(e)}")
+    
+    return app
 
 @app.route('/system/manual-update', methods=['POST'])
 def trigger_manual_update():
@@ -236,5 +242,5 @@ def cleanup_scheduler():
 atexit.register(cleanup_scheduler)
 
 if __name__ == '__main__':
-    # 개발용 설정
+    app = create_app()
     app.run(host='0.0.0.0', port=5000, debug=False)
