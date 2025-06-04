@@ -168,7 +168,7 @@ class HybridRecommendationSystem:
         else:
             return '한식'  # 기본값
 
-    def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.2):
+    def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.4):
         """
         하이브리드 추천 수행
         
@@ -178,7 +178,7 @@ class HybridRecommendationSystem:
             budget: 예산 제한 (None이면 제한 없음)
             top_n: 추천할 식당 수
             alpha: SVD++ 가중치 (0.7이면 SVD++ 70%, 콘텐츠 30%)
-            category_boost: 선호 카테고리 가중치 (0.2 = 20% 추가 점수)
+            category_boost: 선호 카테고리 가중치 (0.4 = 40% 추가 점수)
             
         Returns:
             list: 추천 식당 정보 리스트
@@ -271,11 +271,11 @@ class HybridRecommendationSystem:
                     
                     # 페널티 계산 (초과 정도에 따라 차등)
                     if budget_ratio <= 1.2:  # 20% 이하 초과
-                        penalty = 0.1
-                    elif budget_ratio <= 1.5:  # 50% 이하 초과
                         penalty = 0.3
-                    else:  # 50% 초과
+                    elif budget_ratio <= 1.5:  # 50% 이하 초과
                         penalty = 0.5
+                    else:  # 50% 초과
+                        penalty = 0.7
                     
                     penalized_score = hybrid_score * (1 - penalty)
                     
