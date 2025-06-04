@@ -350,26 +350,46 @@ class HybridRecommendationSystem:
         Returns:
             dict: JSON 형태의 추천 결과
         """
-        recommendations = self.get_hybrid_recommendations(user_id, user_categories, budget, top_n, alpha)
-        
-        # JSON 형태로 변환
-        result = {
-            'user_id': user_id,
-            'recommendations': [
-                {
-                    'restaurant_id': rec['restaurant_id'],
-                    'restaurant_name': rec['restaurant_name'],
-                    'category': rec['category'],
-                    'menu_average': rec['menu_average'],
-                    'predicted_rating': rec['hybrid_score']
-                }
-                for rec in recommendations
-            ],
-            'recommendation_count': len(recommendations),
-            'algorithm': f"Hybrid (SVD++: {alpha*100}%, Content: {(1-alpha)*100}%)"
-        }
-        
-        return result
+        try:
+            recommendations = self.get_hybrid_recommendations(user_id, user_categories, budget, top_n, alpha)
+            
+            logger.info(f"JSON 변환 전 추천 수: {len(recommendations) if recommendations else 0}")
+            
+            # 안전한 데이터 변환
+            recommendation_list = []
+            if recommendations:
+                for rec in recommendations:
+                    try:
+                        recommendation_list.append({
+                            'restaurant_id': int(rec['restaurant_id']),  # 정수 보장
+                            'restaurant_name': str(rec.get('restaurant_name', 'Unknown')),
+                            'category': str(rec.get('category', 'Unknown')),
+                            'menu_average': float(rec.get('menu_average', 0)),
+                            'predicted_rating': float(rec.get('hybrid_score', 0))
+                        })
+                    except (ValueError, TypeError, KeyError) as e:
+                        logger.warning(f"추천 데이터 변환 실패: {rec}, 오류: {e}")
+                        continue
+            
+            result = {
+                'user_id': int(user_id),
+                'recommendations': recommendation_list,
+                'recommendation_count': len(recommendation_list),
+                'algorithm': f"Hybrid (SVD++: {alpha*100:.1f}%, Content: {(1-alpha)*100:.1f}%)"
+            }
+            
+            logger.info(f"JSON 변환 완료 - 최종 추천 수: {len(recommendation_list)}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"JSON 변환 중 오류: {e}")
+            return {
+                'user_id': int(user_id) if user_id else 0,
+                'recommendations': [],
+                'recommendation_count': 0,
+                'algorithm': 'Hybrid (Error)',
+                'error': str(e)
+            }
 
 def get_restaurant_recommendations(user_id, user_categories=None, budget=None, top_n=10):
     """
@@ -391,39 +411,66 @@ def get_restaurant_recommendations(user_id, user_categories=None, budget=None, t
     mappings_path = os.path.join(result_dir, 'restaurant_real_id_mappings.pkl')
     svd_data_path = os.path.join(result_dir, 'svd_data.csv')
     
-    # 파일 존재 여부 확인 및 디버깅 정보 출력
-    logger.info(f"파일 경로 확인:")
-    logger.info(f"  SVD 매트릭스: {svd_matrix_path} (존재: {os.path.exists(svd_matrix_path)})")
-    logger.info(f"  식당 데이터: {restaurants_path} (존재: {os.path.exists(restaurants_path)})")
-    logger.info(f"  콘텐츠 특성: {content_features_path} (존재: {os.path.exists(content_features_path)})")
-    logger.info(f"  매핑 파일: {mappings_path} (존재: {os.path.exists(mappings_path)})")
+    # 파일 존재 여부 확인
+    required_files = {
+        'SVD 매트릭스': svd_matrix_path,
+        '식당 데이터': restaurants_path,
+        '콘텐츠 특성': content_features_path,
+        '매핑 파일': mappings_path,
+        'SVD 데이터': svd_data_path
+    }
+    
+    missing_files = []
+    for name, path in required_files.items():
+        if not os.path.exists(path):
+            missing_files.append(name)
+            logger.error(f"누락된 파일: {name} - {path}")
+    
+    if missing_files:
+        error_msg = f"필수 파일 누락: {', '.join(missing_files)}"
+        logger.error(error_msg)
+        return {
+            'user_id': user_id,
+            'recommendations': [],
+            'recommendation_count': 0,
+            'algorithm': 'Hybrid (File Missing)',
+            'error': error_msg
+        }
     
     try:
+        logger.info(f"추천 시스템 초기화 시작 - 사용자: {user_id}")
+        
         # 하이브리드 시스템 초기화
         hybrid_system = HybridRecommendationSystem(
             svd_matrix_path, restaurants_path, content_features_path, mappings_path
         )
         
+        logger.info("콘텐츠 매트릭스 준비 중...")
         # 콘텐츠 매트릭스 준비
         hybrid_system.prepare_content_matrix(svd_data_path)
         
-        # 추천 수행 (user_categories 전달)
+        logger.info(f"추천 실행 중 - 카테고리: {user_categories}, 예산: {budget}")
+        # 추천 수행
         result = hybrid_system.get_recommendations_json(user_id, user_categories, budget, top_n)
         
+        logger.info(f"추천 시스템 정상 완료 - {result.get('recommendation_count', 0)}개 추천")
         return result
     
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
         logger.error(f"추천 시스템 오류: {e}")
+        logger.error(f"상세 오류:\n{error_detail}")
+        
         return {
             'user_id': user_id,
             'recommendations': [],
             'recommendation_count': 0,
             'algorithm': 'Hybrid (Error)',
-            'error': str(e)
+            'error': str(e),
+            'error_detail': error_detail
         }
-            
-    
-
+        
 # 사용 예시
 # 메인 실행 부분도 안전하게 수정
 

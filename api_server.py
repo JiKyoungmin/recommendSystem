@@ -27,21 +27,21 @@ def recommend_restaurants():
         # GET 요청 처리
         if request.method == 'GET':
             user_id = request.args.get('userId')
-            user_category = request.args.getlist('userCategory')  # 리스트로 받기
+            user_category = request.args.getlist('userCategory')
             remaining_budget = request.args.get('remainingBudget')
         
         # POST 요청 처리
         else:
             data = request.get_json()
             if not data:
-                return jsonify({'error': '요청 데이터가 없습니다'}), 400
+                return jsonify({'error': '요청 데이터가 없습니다', 'restaurantUniqueIds': []}), 400
             
             user_id = data.get('userId')
-            user_category = data.get('userCategory', [])  # 리스트로 받기
+            user_category = data.get('userCategory', [])
             remaining_budget = data.get('remainingBudget')
         
         if user_id is None:
-            return jsonify({'error': 'userId가 필요합니다'}), 400
+            return jsonify({'error': 'userId가 필요합니다', 'restaurantUniqueIds': []}), 400
         
         logger.info(f"추천 요청 - 사용자: {user_id}, 선호 카테고리: {user_category}, 예산: {remaining_budget}")
         
@@ -56,69 +56,46 @@ def recommend_restaurants():
         # 추천 실행
         recommendations = get_restaurant_recommendations(
             user_id=int(user_id),
-            user_categories=user_category,  # 새로 추가
+            user_categories=user_category,
             budget=budget,
             top_n=10
         )
-    
-        restaurant_ids = [rec['restaurant_id'] for rec in recommendations['recommendations']]
+        
+        # 안전한 데이터 추출
+        restaurant_ids = []
+        if recommendations and 'recommendations' in recommendations:
+            for rec in recommendations['recommendations']:
+                if 'restaurant_id' in rec:
+                    # 정수형으로 변환 보장
+                    try:
+                        rest_id = int(rec['restaurant_id'])
+                        restaurant_ids.append(rest_id)
+                    except (ValueError, TypeError):
+                        logger.warning(f"잘못된 restaurant_id 형식: {rec['restaurant_id']}")
+        
+        # 디버깅 로그 추가
+        logger.info(f"추천 결과 상세:")
+        logger.info(f"  전체 응답: {recommendations}")
+        logger.info(f"  추출된 ID 수: {len(restaurant_ids)}")
+        logger.info(f"  추출된 IDs: {restaurant_ids}")
+        
         response = {
             'restaurantUniqueIds': restaurant_ids
         }
+        
         logger.info(f"추천 완료 - {len(restaurant_ids)}개 식당")
+        logger.info(f"최종 응답: {response}")
+        
         return jsonify(response)
         
     except Exception as e:
         logger.error(f"추천 중 오류 발생: {str(e)}")
+        import traceback
+        logger.error(f"상세 오류: {traceback.format_exc()}")
         return jsonify({
             'error': '서버 내부 오류',
             'restaurantUniqueIds': []
         }), 500
-
-@app.route('/health', methods=['GET'])
-def health_check():
-    """
-    서버 상태 확인
-    """
-    return jsonify({'status': 'healthy', 'message': '추천 서버가 정상 작동 중입니다'})
-
-@app.route('/feedback/ratings', methods=['POST'])
-def collect_feedback():
-    """
-    사용자 피드백 및 새로운 평점 데이터 수집
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': '요청 데이터가 없습니다'}), 400
-        
-        # 데이터가 리스트인지 확인 (단일 객체면 리스트로 변환)
-        if isinstance(data, dict):
-            data = [data]
-        
-        logger.info(f"피드백 데이터 {len(data)}개 수신")
-        
-        # 피드백 데이터를 파일에 저장
-        feedback_file = os.path.join('data', 'feedback_queue.jsonl')
-        
-        # 각 피드백을 JSONL 형태로 저장 (한 줄씩 추가)
-        with open(feedback_file, 'a', encoding='utf-8') as f:
-            for feedback_item in data:
-                # 타임스탬프 추가
-                feedback_item['timestamp'] = datetime.now().isoformat()
-                f.write(json.dumps(feedback_item, ensure_ascii=False) + '\n')
-        
-        logger.info(f"피드백 데이터 저장 완료: {feedback_file}")
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'{len(data)}개의 피드백이 저장되었습니다',
-            'received_count': len(data)
-        })
-        
-    except Exception as e:
-        logger.error(f"피드백 수집 중 오류: {str(e)}")
-        return jsonify({'error': '서버 내부 오류'}), 500
 
 #자동 모델 업데이트
 @app.route('/system/update-status', methods=['GET'])
