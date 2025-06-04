@@ -8,6 +8,7 @@ from datetime import datetime
 import pandas as pd
 from scheduler import start_auto_scheduler, stop_auto_scheduler, scheduler_instance
 from pipeline.incremental_update import run_manual_update
+from pipeline.adaptive_weights import AdaptiveWeightManager
 
 # 프로젝트 루트 경로를 Python path에 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -186,31 +187,67 @@ def get_scheduler_info():
         logger.error(f"스케줄러 정보 조회 중 오류: {str(e)}")
         return jsonify({'error': '서버 내부 오류'}), 500
 
-# 서버 종료 시 스케줄러도 정리
-import atexit
+    # 전역 가중치 관리자
+    weight_manager = AdaptiveWeightManager()
 
-def cleanup_scheduler():
-    """
-    서버 종료 시 스케줄러 정리
-    """
-    try:
-        stop_auto_scheduler()
-        logger.info("스케줄러 정리 완료")
-    except Exception as e:
-        logger.error(f"스케줄러 정리 중 오류: {str(e)}")
+    @app.route('/feedback', methods=['POST'])
+    def process_feedback():
+        """
+        사용자 피드백 처리 및 가중치 업데이트
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': '피드백 데이터가 없습니다'}), 400
+            
+            user_id = data.get('userId')
+            feedback_score = data.get('feedback')
+            
+            if not user_id or feedback_score is None:
+                return jsonify({'error': 'userId와 feedback이 필요합니다'}), 400
+            
+            # 가중치 업데이트
+            updated_weights = weight_manager.update_weights_from_feedback(
+                user_id=user_id,
+                feedback_score=feedback_score,
+                recommendation_method='hybrid'
+            )
+            
+            logger.info(f"피드백 처리 완료 - 사용자: {user_id}, 점수: {feedback_score}")
+            
+            return jsonify({
+                'status': 'success',
+                'updated_weights': updated_weights
+            })
+            
+        except Exception as e:
+            logger.error(f"피드백 처리 중 오류: {str(e)}")
+            return jsonify({'error': '서버 내부 오류'}), 500
 
-atexit.register(cleanup_scheduler)
+    # 서버 종료 시 스케줄러도 정리
+    import atexit
 
-def initialize_scheduler():
-    """
-    스케줄러 초기화
-    """
-    try:
-        start_auto_scheduler()
-        logger.info("✅ 자동 업데이트 스케줄러 시작됨")
-    except Exception as e:
-        logger.error(f"❌ 스케줄러 시작 실패: {str(e)}")
+    def cleanup_scheduler():
+        """
+        서버 종료 시 스케줄러 정리
+        """
+        try:
+            stop_auto_scheduler()
+            logger.info("스케줄러 정리 완료")
+        except Exception as e:
+            logger.error(f"스케줄러 정리 중 오류: {str(e)}")
 
+    atexit.register(cleanup_scheduler)
+
+    def initialize_scheduler():
+        """
+        스케줄러 초기화
+        """
+        try:
+            start_auto_scheduler()
+            logger.info("✅ 자동 업데이트 스케줄러 시작됨")
+        except Exception as e:
+            logger.error(f"❌ 스케줄러 시작 실패: {str(e)}")
 
 if __name__ == '__main__':
     initialize_scheduler()

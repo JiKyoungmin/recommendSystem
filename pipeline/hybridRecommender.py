@@ -168,7 +168,7 @@ class HybridRecommendationSystem:
         else:
             return '한식'  # 기본값
 
-    def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.4):
+    def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.7):
         """
         하이브리드 추천 수행
         
@@ -178,7 +178,7 @@ class HybridRecommendationSystem:
             budget: 예산 제한 (None이면 제한 없음)
             top_n: 추천할 식당 수
             alpha: SVD++ 가중치 (0.7이면 SVD++ 70%, 콘텐츠 30%)
-            category_boost: 선호 카테고리 가중치 (0.4 = 40% 추가 점수)
+            category_boost: 선호 카테고리 가중치 (0.7 = 70% 추가 점수)
             
         Returns:
             list: 추천 식당 정보 리스트
@@ -530,22 +530,32 @@ def get_restaurant_recommendations(user_id, user_categories=None, budget=None, t
         }
     
     try:
-        logger.info(f"추천 시스템 초기화 시작 - 사용자: {user_id}")
+        # 동적 가중치 관리자 초기화
+        from .adaptive_weights import AdaptiveWeightManager
+        weight_manager = AdaptiveWeightManager()
+        
+        # 사용자별 최적화된 가중치 가져오기
+        user_weights = weight_manager.get_user_weights(user_id)
+        adaptive_alpha = user_weights['alpha']
+        adaptive_category_boost = user_weights['category_boost']
+        
+        logger.info(f"사용자 {user_id} 적응형 가중치: α={adaptive_alpha:.3f}, boost={adaptive_category_boost:.3f}")
         
         # 하이브리드 시스템 초기화
         hybrid_system = HybridRecommendationSystem(
             svd_matrix_path, restaurants_path, content_features_path, mappings_path
         )
         
-        logger.info("콘텐츠 매트릭스 준비 중...")
         # 콘텐츠 매트릭스 준비
         hybrid_system.prepare_content_matrix(svd_data_path)
         
-        logger.info(f"추천 실행 중 - 카테고리: {user_categories}, 예산: {budget}")
-        # 추천 수행
-        result = hybrid_system.get_recommendations_json(user_id, user_categories, budget, top_n)
+        # 동적 가중치로 추천 수행
+        result = hybrid_system.get_recommendations_json(
+            user_id, user_categories, budget, top_n, 
+            alpha=adaptive_alpha  # 동적 가중치 사용
+        )
         
-        logger.info(f"추천 시스템 정상 완료 - {result.get('recommendation_count', 0)}개 추천")
+        logger.info(f"적응형 추천 완료 - {result.get('recommendation_count', 0)}개 추천")
         return result
     
     except Exception as e:
