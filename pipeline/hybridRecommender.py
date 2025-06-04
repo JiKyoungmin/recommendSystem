@@ -89,59 +89,64 @@ class HybridRecommendationSystem:
         실제 ID + 가상 ID 통합 식당 정보 딕셔너리 생성
         매핑 정보를 활용해 가상 ID에도 식당 정보 제공
         """
-        self.restaurant_info_dict = {}
+        self.restaurant_info = {}  # restaurant_info_dict → restaurant_info로 변경
         
         # 1단계: restaurants.csv의 실제 식당 정보 로드
         for _, restaurant in self.restaurants.iterrows():
-            self.restaurant_info_dict[restaurant['id']] = {
+            self.restaurant_info[restaurant['id']] = {
                 'name': restaurant['name'],
                 'category': restaurant['category'],
                 'menu_average': restaurant['menu_average']
             }
         
-        logger.info(f"실제 식당 정보 로드: {len(self.restaurant_info_dict)}개")
+        logger.info(f"실제 식당 정보 로드: {len(self.restaurant_info)}개")
         
         # 2단계: 매핑 정보를 활용해 가상 ID 정보 생성
         virtual_count = 0
         
-        if 'all_mappings' in dir(self) or hasattr(self, 'survey_to_id'):
-            # survey_to_id에서 가상 ID들 찾기
-            for survey_name, mapped_id in self.survey_to_id.items():
-                # 가상 ID (0~1000 범위의 작은 숫자) 처리
-                if mapped_id < 1000 and mapped_id not in self.restaurant_info_dict:
-                    # 매핑된 실제 ID가 있는지 확인
-                    real_restaurant_info = None
+        # survey_to_id에서 가상 ID들 찾기
+        for survey_name, mapped_id in self.survey_to_id.items():
+            # 가상 ID (0~1000 범위의 작은 숫자) 처리
+            if mapped_id < 1000 and mapped_id not in self.restaurant_info:
+                # 매핑된 실제 ID가 있는지 확인
+                real_restaurant_info = None
+                
+                # 같은 설문명으로 실제 ID에 매핑된 식당이 있는지 찾기
+                for other_survey, other_id in self.survey_to_id.items():
+                    if (other_survey == survey_name and 
+                        other_id > 1000 and 
+                        other_id in self.restaurant_info):
+                        real_restaurant_info = self.restaurant_info[other_id]
+                        break
+                
+                # 실제 식당 정보가 있으면 사용, 없으면 기본값 생성
+                if real_restaurant_info:
+                    self.restaurant_info[mapped_id] = real_restaurant_info.copy()
+                    logger.debug(f"가상 ID {mapped_id}: {survey_name} → 실제 식당 정보 복사")
+                else:
+                    # 설문명에서 카테고리 추정
+                    estimated_category = self._estimate_category_from_name(survey_name)
                     
-                    # 같은 설문명으로 실제 ID에 매핑된 식당이 있는지 찾기
-                    for other_survey, other_id in self.survey_to_id.items():
-                        if (other_survey == survey_name and 
-                            other_id > 1000 and 
-                            other_id in self.restaurant_info_dict):
-                            real_restaurant_info = self.restaurant_info_dict[other_id]
-                            break
-                    
-                    # 실제 식당 정보가 있으면 사용, 없으면 기본값 생성
-                    if real_restaurant_info:
-                        self.restaurant_info_dict[mapped_id] = real_restaurant_info.copy()
-                    else:
-                        # 설문명에서 카테고리 추정
-                        estimated_category = self._estimate_category_from_name(survey_name)
-                        
-                        self.restaurant_info_dict[mapped_id] = {
-                            'name': survey_name,
-                            'category': estimated_category,
-                            'menu_average': 20000  # 기본 평균 가격
-                        }
-                    
-                    virtual_count += 1
-                    logger.debug(f"가상 ID {mapped_id}: {survey_name}")
+                    self.restaurant_info[mapped_id] = {
+                        'name': survey_name,
+                        'category': estimated_category,
+                        'menu_average': 20000  # 기본 평균 가격
+                    }
+                    logger.debug(f"가상 ID {mapped_id}: {survey_name} → 새 정보 생성 ({estimated_category})")
+                
+                virtual_count += 1
         
         logger.info(f"가상 식당 정보 생성: {virtual_count}개")
-        logger.info(f"통합 식당 정보 딕셔너리 완성: {len(self.restaurant_info_dict)}개")
+        logger.info(f"통합 식당 정보 딕셔너리 완성: {len(self.restaurant_info)}개")
         
-        # 샘플 출력 (디버깅용)
-        sample_ids = list(self.restaurant_info_dict.keys())[:5]
-        logger.info(f"식당 정보 샘플: {[(id, self.restaurant_info_dict[id]['name']) for id in sample_ids]}")
+        # 추천에서 사용되는 ID들이 포함되어 있는지 확인
+        sample_virtual_ids = [id for id in self.restaurant_info.keys() if id < 50]
+        logger.info(f"가상 ID 샘플 (0~49): {sample_virtual_ids[:10]}")
+    
+        # 각 ID별 정보 확인
+        for sample_id in sample_virtual_ids[:5]:
+            info = self.restaurant_info[sample_id]
+            logger.info(f"ID {sample_id}: {info['name']} ({info['category']}, {info['menu_average']}원)")
 
     def _estimate_category_from_name(self, restaurant_name):
         """
