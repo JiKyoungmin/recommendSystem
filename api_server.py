@@ -224,30 +224,30 @@ def get_scheduler_info():
             logger.error(f"피드백 처리 중 오류: {str(e)}")
             return jsonify({'error': '서버 내부 오류'}), 500
 
-    # 서버 종료 시 스케줄러도 정리
-    import atexit
+# 서버 종료 시 스케줄러도 정리
+import atexit
 
-    def cleanup_scheduler():
-        """
-        서버 종료 시 스케줄러 정리
-        """
-        try:
-            stop_auto_scheduler()
-            logger.info("스케줄러 정리 완료")
-        except Exception as e:
-            logger.error(f"스케줄러 정리 중 오류: {str(e)}")
+def cleanup_scheduler():
+    """
+    서버 종료 시 스케줄러 정리
+    """
+    try:
+        stop_auto_scheduler()
+        logger.info("스케줄러 정리 완료")
+    except Exception as e:
+        logger.error(f"스케줄러 정리 중 오류: {str(e)}")
 
-    atexit.register(cleanup_scheduler)
+atexit.register(cleanup_scheduler)
 
-    def initialize_scheduler():
-        """
-        스케줄러 초기화
-        """
-        try:
-            start_auto_scheduler()
-            logger.info("✅ 자동 업데이트 스케줄러 시작됨")
-        except Exception as e:
-            logger.error(f"❌ 스케줄러 시작 실패: {str(e)}")
+def initialize_scheduler():
+    """
+    스케줄러 초기화
+    """
+    try:
+        start_auto_scheduler()
+        logger.info("✅ 자동 업데이트 스케줄러 시작됨")
+    except Exception as e:
+        logger.error(f"❌ 스케줄러 시작 실패: {str(e)}")
 
 if __name__ == '__main__':
     initialize_scheduler()
