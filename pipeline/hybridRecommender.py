@@ -211,56 +211,56 @@ class HybridRecommendationSystem:
         
         return result
 
-    def get_restaurant_recommendations(user_id, user_categories=None, budget=None, top_n=10):
-        """
-        API 서버에서 호출할 메인 추천 함수
-        """
-        import os
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        if 'pipeline' in current_dir:
-            base_dir = os.path.dirname(current_dir) 
-        else:
-            base_dir = current_dir
+def get_restaurant_recommendations(user_id, user_categories=None, budget=None, top_n=10):
+    """
+    API 서버에서 호출할 메인 추천 함수
+    """
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if 'pipeline' in current_dir:
+        base_dir = os.path.dirname(current_dir) 
+    else:
+        base_dir = current_dir
+    
+    data_dir = os.path.join(base_dir, 'data')
+    result_dir = os.path.join(base_dir, 'result')
+    
+    svd_matrix_path = os.path.join(result_dir, 'prediction_matrix.csv')
+    restaurants_path = os.path.join(data_dir, 'restaurants.csv')
+    content_features_path = os.path.join(data_dir, 'content_features.csv')
+    mappings_path = os.path.join(result_dir, 'restaurant_real_id_mappings.pkl')
+    svd_data_path = os.path.join(result_dir, 'svd_data.csv')
+    
+    # 파일 존재 여부 확인 및 디버깅 정보 출력
+    logger.info(f"파일 경로 확인:")
+    logger.info(f"  SVD 매트릭스: {svd_matrix_path} (존재: {os.path.exists(svd_matrix_path)})")
+    logger.info(f"  식당 데이터: {restaurants_path} (존재: {os.path.exists(restaurants_path)})")
+    logger.info(f"  콘텐츠 특성: {content_features_path} (존재: {os.path.exists(content_features_path)})")
+    logger.info(f"  매핑 파일: {mappings_path} (존재: {os.path.exists(mappings_path)})")
+    
+    try:
+        # 하이브리드 시스템 초기화
+        hybrid_system = HybridRecommendationSystem(
+            svd_matrix_path, restaurants_path, content_features_path, mappings_path
+        )
         
-        data_dir = os.path.join(base_dir, 'data')
-        result_dir = os.path.join(base_dir, 'result')
+        # 콘텐츠 매트릭스 준비
+        hybrid_system.prepare_content_matrix(svd_data_path)
         
-        svd_matrix_path = os.path.join(result_dir, 'prediction_matrix.csv')
-        restaurants_path = os.path.join(data_dir, 'restaurants.csv')
-        content_features_path = os.path.join(data_dir, 'content_features.csv')
-        mappings_path = os.path.join(result_dir, 'restaurant_real_id_mappings.pkl')
-        svd_data_path = os.path.join(result_dir, 'svd_data.csv')
+        # 추천 수행 (user_categories 전달)
+        result = hybrid_system.get_recommendations_json(user_id, user_categories, budget, top_n)
         
-        # 파일 존재 여부 확인 및 디버깅 정보 출력
-        logger.info(f"파일 경로 확인:")
-        logger.info(f"  SVD 매트릭스: {svd_matrix_path} (존재: {os.path.exists(svd_matrix_path)})")
-        logger.info(f"  식당 데이터: {restaurants_path} (존재: {os.path.exists(restaurants_path)})")
-        logger.info(f"  콘텐츠 특성: {content_features_path} (존재: {os.path.exists(content_features_path)})")
-        logger.info(f"  매핑 파일: {mappings_path} (존재: {os.path.exists(mappings_path)})")
-        
-        try:
-            # 하이브리드 시스템 초기화
-            hybrid_system = HybridRecommendationSystem(
-                svd_matrix_path, restaurants_path, content_features_path, mappings_path
-            )
-            
-            # 콘텐츠 매트릭스 준비
-            hybrid_system.prepare_content_matrix(svd_data_path)
-            
-            # 추천 수행 (user_categories 전달)
-            result = hybrid_system.get_recommendations_json(user_id, user_categories, budget, top_n)
-            
-            return result
-        
-        except Exception as e:
-            logger.error(f"추천 시스템 오류: {e}")
-            return {
-                'user_id': user_id,
-                'recommendations': [],
-                'recommendation_count': 0,
-                'algorithm': 'Hybrid (Error)',
-                'error': str(e)
-            }
+        return result
+    
+    except Exception as e:
+        logger.error(f"추천 시스템 오류: {e}")
+        return {
+            'user_id': user_id,
+            'recommendations': [],
+            'recommendation_count': 0,
+            'algorithm': 'Hybrid (Error)',
+            'error': str(e)
+        }
             
     
 
