@@ -218,6 +218,24 @@ def get_scheduler_info():
         logger.error(f"스케줄러 정보 조회 중 오류: {str(e)}")
         return jsonify({'error': '서버 내부 오류'}), 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """서버 상태 확인용 엔드포인트"""
+    logger.info("Health check 요청 받음")
+    return jsonify({
+        'status': 'healthy',
+        'message': '서버가 정상 동작 중입니다'
+    })
+
+@app.route('/api/test', methods=['GET'])
+def test_endpoint():
+    """간단한 테스트용 엔드포인트"""
+    logger.info("Test 엔드포인트 요청 받음")
+    return jsonify({
+        'message': '테스트 성공',
+        'timestamp': datetime.now().isoformat()
+    })
+
 # 서버 종료 시 스케줄러도 정리
 import atexit
 
