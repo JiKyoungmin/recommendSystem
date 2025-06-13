@@ -35,15 +35,24 @@ def recommend_restaurants():
             feedback = request.args.get('feedback')
         
         # POST 요청 처리
+        # POST 요청 처리 부분 수정
         else:
             data = request.get_json()
             if not data:
                 return jsonify({'error': '요청 데이터가 없습니다', 'restaurantUniqueIds': []}), 400
             
+            # 기존 필드들
             user_id = data.get('userId')
             user_category = data.get('userCategory', [])
             remaining_budget = data.get('remainingBudget')
             feedback = data.get('feedback')
+            
+            # 새로 추가된 필드 처리
+            restaurant_ratings = data.get('restaurantRatings', [])
+            
+            # 로깅으로 디버깅
+            logger.info(f"받은 요청 데이터: {data}")
+            logger.info(f"추출된 필드들 - userId: {user_id}, userCategory: {user_category}, budget: {remaining_budget}, feedback: {feedback}")
         
         if user_id is None:
             return jsonify({'error': 'userId가 필요합니다', 'restaurantUniqueIds': []}), 400
