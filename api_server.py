@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 weight_manager = AdaptiveWeightManager()
 
-@app.route('/recommendation/restaurants', methods=['GET', 'POST'])
+@app.route('/api/recommendation/restaurants', methods=['GET', 'POST'])
 def recommend_restaurants():
     """
     식당 추천 API 엔드포인트 (피드백 처리 포함)
