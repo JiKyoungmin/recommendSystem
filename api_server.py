@@ -33,6 +33,7 @@ def recommend_restaurants():
             user_category = request.args.getlist('userCategory')
             remaining_budget = request.args.get('remainingBudget')
             feedback = request.args.get('feedback')
+            restaurant_ratings = data.get('restaurantRatings', [])
         
         # POST 요청 처리
         # POST 요청 처리 부분 수정
