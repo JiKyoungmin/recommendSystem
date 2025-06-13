@@ -247,4 +247,4 @@ if __name__ == '__main__':
     initialize_scheduler()
     
     logger.info("🚀 추천 서버 시작 중...")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
