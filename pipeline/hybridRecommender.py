@@ -167,6 +167,81 @@ class HybridRecommendationSystem:
             return '아시안'
         else:
             return '한식'  # 기본값
+    
+    def calculate_value_score(self, hybrid_score, menu_price, budget):
+        """
+        가성비 점수 계산: 점수가 높고 가격이 합리적인 식당 우선
+        
+        Args:
+            hybrid_score: 하이브리드 추천 점수
+            menu_price: 식당 메뉴 평균 가격  
+            budget: 사용자 예산
+        
+        Returns:
+            float: 가성비 점수 (높을수록 좋음)
+        """
+        if budget is None or budget == 0:
+            return hybrid_score
+        
+        # 예산 대비 가격 비율
+        price_ratio = menu_price / budget
+        
+        # 가성비 점수 = 추천점수 / 가격비율
+        # 예: 점수 4.5, 가격 15000원, 예산 10000원 → 4.5 / 1.5 = 3.0
+        value_score = hybrid_score / price_ratio
+        
+        return value_score
+
+    def calculate_budget_aware_score(self, hybrid_score, menu_price, budget, 
+                                price_weight=0.3):
+        """
+        예산 인식 복합 점수 계산
+        
+        Args:
+            hybrid_score: 원래 하이브리드 점수
+            menu_price: 식당 가격
+            budget: 사용자 예산
+            price_weight: 가격 고려 비중 (0.0~1.0)
+        
+        Returns:
+            dict: 복합 점수 정보
+        """
+        if budget is None:
+            return {
+                'final_score': hybrid_score,
+                'price_penalty': 0,
+                'value_bonus': 0
+            }
+        
+        # 1. 예산 초과율 계산
+        budget_excess_ratio = (menu_price - budget) / budget if menu_price > budget else 0
+        
+        # 2. 차등 페널티 계산
+        if budget_excess_ratio <= 0.2:  # 20% 이하 초과
+            price_penalty = 0.1
+        elif budget_excess_ratio <= 0.5:  # 50% 이하 초과  
+            price_penalty = 0.3
+        elif budget_excess_ratio <= 1.0:  # 100% 이하 초과
+            price_penalty = 0.5
+        else:  # 100% 초과
+            price_penalty = 0.7
+        
+        # 3. 가성비 보너스 계산 (점수가 높고 가격이 상대적으로 낮으면 보너스)
+        if menu_price <= budget * 1.3:  # 예산의 130% 이하면
+            value_bonus = (hybrid_score - 2.5) * 0.1  # 평균 점수(2.5) 대비 보너스
+        else:
+            value_bonus = 0
+        
+        # 4. 최종 점수 계산
+        penalized_score = hybrid_score * (1 - price_penalty)
+        final_score = penalized_score + value_bonus
+        
+        return {
+            'final_score': max(final_score, 0.5),  # 최소 0.5점 보장
+            'price_penalty': price_penalty,
+            'value_bonus': value_bonus,
+            'budget_excess_ratio': budget_excess_ratio
+        }
 
     def get_hybrid_recommendations(self, user_id, user_categories=None, budget=None, top_n=10, alpha=0.7, category_boost=0.7):
         """
@@ -264,30 +339,27 @@ class HybridRecommendationSystem:
                         'menu_price': menu_price,
                         'budget_status': 'within'
                     }
+                # 기존 코드에서 예산 초과 식당 처리 부분 수정
                 else:
-                    # 예산 초과 식당 - 페널티 적용
+                    # 예산 초과 식당 - 가성비 기반 점수 계산
                     budget_excess = menu_price - budget
-                    budget_ratio = menu_price / budget
                     
-                    # 페널티 계산 (초과 정도에 따라 차등)
-                    if budget_ratio <= 1.2:  # 20% 이하 초과
-                        penalty = 0.3
-                    elif budget_ratio <= 1.5:  # 50% 이하 초과
-                        penalty = 0.5
-                    else:  # 50% 초과
-                        penalty = 0.7
-                    
-                    penalized_score = hybrid_score * (1 - penalty)
+                    # 새로운 가성비 점수 계산
+                    budget_aware_result = self.calculate_budget_aware_score(
+                        hybrid_score, menu_price, budget, price_weight=0.3
+                    )
                     
                     budget_over[restaurant_id] = {
-                        'hybrid_score': penalized_score,
+                        'hybrid_score': budget_aware_result['final_score'],  # 가성비 점수 사용
                         'original_score': hybrid_score,
                         'svd_score': svd_score,
                         'content_score': content_score,
                         'menu_price': menu_price,
                         'budget_status': 'over',
                         'budget_excess': budget_excess,
-                        'penalty_applied': penalty
+                        'price_penalty': budget_aware_result['price_penalty'],
+                        'value_bonus': budget_aware_result['value_bonus'],
+                        'budget_excess_ratio': budget_aware_result['budget_excess_ratio']
                     }
             else:
                 # 예산 제한 없음 또는 가격 정보 없음
@@ -410,10 +482,22 @@ class HybridRecommendationSystem:
             # 예산 초과 식당을 페널티 적용된 점수로 정렬
             over_sorted = sorted(
                 budget_over.items(),
-                key=lambda x: x[1]['hybrid_score'],  # 이미 페널티 적용된 점수
+                key=lambda x: (
+                x[1]['hybrid_score'],  # 1순위: 가성비 점수
+                -x[1]['budget_excess_ratio']  # 2순위: 예산 초과율 낮은 순
+                ),
                 reverse=True
             )
             
+            logger.info(f"예산 초과 식당 가성비 순위:")
+            for i, (rest_id, scores) in enumerate(over_sorted[:5], 1):
+                restaurant_info = self.restaurant_info.get(rest_id, {})
+                logger.info(f"  {i}. {restaurant_info.get('name', 'Unknown')}: "
+                        f"가성비점수={scores['hybrid_score']:.2f}, "
+                        f"원점수={scores['original_score']:.2f}, "
+                        f"가격={scores['menu_price']:,}원, "
+                        f"초과율={scores['budget_excess_ratio']:.1%}")
+
             for rest_id, scores in over_sorted[:remaining_slots]:
                 restaurant_info = self.restaurant_info.get(rest_id, {})
                 
